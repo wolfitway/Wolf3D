@@ -98,13 +98,22 @@ html, body {
   font-weight: 300;
 }
 
-/* Style Selector Bar (Top Center) */
+/* Header Center Controls: Layout & Style Selectors */
+.header-center-controls {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.plan-selector-bar,
 .style-selector-bar {
   pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   padding: 0.35rem 0.65rem;
@@ -113,6 +122,7 @@ html, body {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
+.control-label,
 .style-label {
   font-size: 0.72rem;
   font-weight: 600;
@@ -122,6 +132,7 @@ html, body {
   margin-right: 0.2rem;
 }
 
+.plan-pill,
 .style-pill {
   background: transparent;
   border: none;
@@ -133,13 +144,16 @@ html, body {
   border-radius: 20px;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
+.plan-pill:hover,
 .style-pill:hover {
   color: #1e1b17;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.85);
 }
 
+.plan-pill.active,
 .style-pill.active {
   background: #25221e;
   color: #ffffff;
@@ -727,6 +741,69 @@ html, body {
 }
 
 /* CAD Editor Styles */
+.cad-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.cad-section h4 {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.plan-preset-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.plan-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(40, 36, 32, 0.1);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.plan-card:hover {
+  background: #ffffff;
+  border-color: var(--accent-orange);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.plan-card.active {
+  background: #ffffff;
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 0 2px rgba(199, 102, 43, 0.25);
+}
+
+.plan-card-icon {
+  font-size: 1.25rem;
+  margin-bottom: 0.1rem;
+}
+
+.plan-card-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.plan-card-meta {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
 .cad-slider-group {
   display: flex;
   flex-direction: column;

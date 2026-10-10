@@ -22,13 +22,24 @@
         <h1 class="title">Adaptive <em>Spatial</em><br>Engine</h1>
       </div>
 
-      <!-- Architectural Style Selector -->
-      <div class="style-selector-bar" role="toolbar" aria-label="Aesthetic Styles">
-        <span class="style-label">Style:</span>
-        <button class="style-pill active" data-style="scandi" id="style-scandi">Scandinavian</button>
-        <button class="style-pill" data-style="mediterranean" id="style-med">Mediterranean</button>
-        <button class="style-pill" data-style="european" id="style-euro">European Classic</button>
-        <button class="style-pill" data-style="japandi" id="style-japandi">Asian Japandi</button>
+      <!-- Center Controls: House Plan & Style Selectors -->
+      <div class="header-center-controls">
+        <!-- House Layout / Plan Selector -->
+        <div class="plan-selector-bar" role="toolbar" aria-label="House Architecture Layouts">
+          <span class="control-label">Plan:</span>
+          <button class="plan-pill active" data-plan="villa" id="plan-villa">Villa (3-Room)</button>
+          <button class="plan-pill" data-plan="studio" id="plan-studio">Micro Studio</button>
+          <button class="plan-pill" data-plan="loft" id="plan-loft">Open Loft</button>
+        </div>
+
+        <!-- Architectural Style Selector -->
+        <div class="style-selector-bar" role="toolbar" aria-label="Aesthetic Styles">
+          <span class="control-label">Style:</span>
+          <button class="style-pill active" data-style="scandi" id="style-scandi">Scandinavian</button>
+          <button class="style-pill" data-style="mediterranean" id="style-med">Mediterranean</button>
+          <button class="style-pill" data-style="european" id="style-euro">European Classic</button>
+          <button class="style-pill" data-style="japandi" id="style-japandi">Asian Japandi</button>
+        </div>
       </div>
 
       <!-- Camera View Modes -->
@@ -242,53 +253,81 @@
     <!-- Parametric Room CAD Editor Drawer -->
     <div class="panel-drawer left-drawer" id="cad-drawer">
       <div class="drawer-header">
-        <h3>Parametric Room CAD</h3>
+        <h3>Parametric House CAD</h3>
         <button class="close-btn" id="close-cad-btn">&times;</button>
       </div>
       <div class="drawer-body">
-        <p class="catalog-hint">Adjust architectural room dimensions in real-time. Procedural walls, floors, and dimensions automatically recalculate.</p>
+        <p class="catalog-hint">Switch house floorplan templates or calibrate parametric dimensions. Procedural walls, partition portals, and physics colliders adapt dynamically.</p>
 
-        <div class="cad-slider-group">
-          <div class="slider-header">
-            <label for="room-width-slider">Room Width</label>
-            <span class="slider-val" id="val-width">6.8 m</span>
+        <div class="cad-section">
+          <h4>Architectural Floorplan Presets</h4>
+          <div class="plan-preset-grid">
+            <button class="plan-card active" data-plan="villa" id="cad-plan-villa">
+              <div class="plan-card-icon">🏡</div>
+              <div class="plan-card-title">Villa Suite (3-Room)</div>
+              <div class="plan-card-meta">11.0 &times; 7.8m &bull; 85.8 M&sup2; &bull; Salon, Kitchen & Master Suite</div>
+            </button>
+            <button class="plan-card" data-plan="studio" id="cad-plan-studio">
+              <div class="plan-card-icon">📐</div>
+              <div class="plan-card-title">Adaptive Micro Studio</div>
+              <div class="plan-card-meta">6.8 &times; 5.2m &bull; 35.4 M&sup2; &bull; Modular Joinery</div>
+            </button>
+            <button class="plan-card" data-plan="loft" id="cad-plan-loft">
+              <div class="plan-card-icon">🏢</div>
+              <div class="plan-card-title">Open Industrial Loft</div>
+              <div class="plan-card-meta">9.0 &times; 7.0m &bull; 63.0 M&sup2; &bull; Creative Open Plan</div>
+            </button>
           </div>
-          <input type="range" id="room-width-slider" min="5.0" max="10.0" step="0.2" value="6.8">
         </div>
 
-        <div class="cad-slider-group">
-          <div class="slider-header">
-            <label for="room-depth-slider">Room Depth</label>
-            <span class="slider-val" id="val-depth">5.2 m</span>
+        <div class="cad-section">
+          <h4>Parametric Scaling</h4>
+          <div class="cad-slider-group">
+            <div class="slider-header">
+              <label for="room-width-slider">Footprint Width</label>
+              <span class="slider-val" id="val-width">11.0 m</span>
+            </div>
+            <input type="range" id="room-width-slider" min="5.0" max="14.0" step="0.2" value="11.0">
           </div>
-          <input type="range" id="room-depth-slider" min="4.0" max="8.0" step="0.2" value="5.2">
-        </div>
 
-        <div class="cad-slider-group">
-          <div class="slider-header">
-            <label for="room-height-slider">Ceiling Height</label>
-            <span class="slider-val" id="val-height">3.4 m</span>
+          <div class="cad-slider-group">
+            <div class="slider-header">
+              <label for="room-depth-slider">Footprint Depth</label>
+              <span class="slider-val" id="val-depth">7.8 m</span>
+            </div>
+            <input type="range" id="room-depth-slider" min="4.0" max="10.0" step="0.2" value="7.8">
           </div>
-          <input type="range" id="room-height-slider" min="2.6" max="4.5" step="0.1" value="3.4">
+
+          <div class="cad-slider-group">
+            <div class="slider-header">
+              <label for="room-height-slider">Ceiling Height</label>
+              <span class="slider-val" id="val-height">3.4 m</span>
+            </div>
+            <input type="range" id="room-height-slider" min="2.6" max="4.8" step="0.1" value="3.4">
+          </div>
         </div>
 
         <div class="cad-readout-card">
           <div class="readout-row">
             <span>Enclosed Floor Area:</span>
-            <strong id="readout-area">35.4 M&sup2;</strong>
+            <strong id="readout-area">85.8 M&sup2;</strong>
           </div>
           <div class="readout-row">
             <span>Internal Volume:</span>
-            <strong id="readout-volume">120.2 M&sup3;</strong>
+            <strong id="readout-volume">291.7 M&sup3;</strong>
+          </div>
+          <div class="readout-row">
+            <span>Partition Portals:</span>
+            <strong id="readout-doors">2 Walkable Doors</strong>
           </div>
           <div class="readout-row">
             <span>Physics Rigid Bodies:</span>
-            <strong id="readout-bodies">Active</strong>
+            <strong id="readout-bodies">Active (Rapier WASM)</strong>
           </div>
         </div>
 
         <div class="cad-actions">
-          <button class="ctrl-btn full-width" id="reset-cad-btn">Reset to Standard Studio (6.8 &times; 5.2m)</button>
+          <button class="ctrl-btn full-width" id="reset-cad-btn">Reset Current Plan Dimensions</button>
         </div>
       </div>
     </div>
