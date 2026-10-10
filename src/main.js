@@ -232,7 +232,7 @@ function createCrateWoodTexture() {
   return texture;
 }
 
-function createZoneBadgeCanvas(title, sub) {
+function createZoneBadge(title, sub) {
   const canvas = document.createElement('canvas');
   canvas.width = 360;
   canvas.height = 110;
