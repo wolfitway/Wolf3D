@@ -581,3 +581,201 @@ export function createWovenLinenCurtainTexture() {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
+
+/**
+ * Large-Format Honed Travertine Tile Flooring (1200x600mm architectural tiles)
+ */
+export function createLargeFormatTravertineTileTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+
+  // Warm Roman travertine / Crema Marfil limestone base
+  ctx.fillStyle = '#eee6d8';
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  // Subtle natural stone sedimentary bands
+  for (let i = 0; i < 70; i++) {
+    const y = Math.random() * 1024;
+    const h = 6 + Math.random() * 32;
+    const isLight = Math.random() > 0.45;
+    ctx.fillStyle = isLight
+      ? `rgba(255, 252, 245, ${0.08 + Math.random() * 0.12})`
+      : `rgba(200, 180, 155, ${0.06 + Math.random() * 0.10})`;
+    ctx.fillRect(0, y, 1024, h);
+  }
+
+  // Soft diagonal mineral veining
+  for (let v = 0; v < 16; v++) {
+    const sx = Math.random() * 1024;
+    const sy = Math.random() * 1024;
+    ctx.strokeStyle = 'rgba(185, 165, 140, 0.08)';
+    ctx.lineWidth = 2 + Math.random() * 4;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.bezierCurveTo(sx + 150, sy + 30, sx + 300, sy - 20, sx + 500, sy + 40);
+    ctx.stroke();
+  }
+
+  // Micro travertine pores & stipples
+  for (let p = 0; p < 180; p++) {
+    const px = Math.random() * 1024;
+    const py = Math.random() * 1024;
+    const pw = 2 + Math.random() * 8;
+    const ph = 1.5 + Math.random() * 3.5;
+    ctx.fillStyle = 'rgba(145, 125, 105, 0.09)';
+    ctx.beginPath();
+    ctx.ellipse(px, py, pw, ph, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Delicate 2mm Architectural Grout Lines (Tile Grid: 2 columns, 4 rows)
+  ctx.strokeStyle = 'rgba(140, 125, 110, 0.35)';
+  ctx.lineWidth = 2.5;
+
+  // Vertical joint
+  ctx.beginPath();
+  ctx.moveTo(512, 0);
+  ctx.lineTo(512, 1024);
+  ctx.stroke();
+
+  // Horizontal joints (staggered bond)
+  [256, 512, 768].forEach(gy => {
+    ctx.beginPath();
+    ctx.moveTo(0, gy);
+    ctx.lineTo(1024, gy);
+    ctx.stroke();
+  });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(4, 4);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Architectural Teak Timber Decking (140mm wide boards with shadow gaps)
+ */
+export function createTeakDeckPlankTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+
+  // Rich warm golden teak wood background
+  ctx.fillStyle = '#8f5c34';
+  ctx.fillRect(0, 0, 1024, 1024);
+
+  const plankCount = 16;
+  const plankH = 1024 / plankCount;
+  const gapH = 3.5;
+
+  for (let i = 0; i < plankCount; i++) {
+    const y = i * plankH;
+    const bh = plankH - gapH;
+
+    // Slight plank-to-plank natural color variation
+    const toneMod = (Math.sin(i * 4.3) * 0.12);
+    const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+    grad.addColorStop(0, `rgb(${Math.round(145 + toneMod * 30)}, ${Math.round(92 + toneMod * 25)}, ${Math.round(52 + toneMod * 20)})`);
+    grad.addColorStop(0.5, `rgb(${Math.round(162 + toneMod * 30)}, ${Math.round(105 + toneMod * 25)}, ${Math.round(60 + toneMod * 20)})`);
+    grad.addColorStop(1, `rgb(${Math.round(135 + toneMod * 30)}, ${Math.round(85 + toneMod * 25)}, ${Math.round(48 + toneMod * 20)})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, y, 1024, bh);
+
+    // Fine horizontal wood grain lines
+    for (let g = 0; g < 14; g++) {
+      const gy = y + 2 + Math.random() * (bh - 4);
+      ctx.strokeStyle = Math.random() > 0.5 ? 'rgba(75, 42, 20, 0.22)' : 'rgba(210, 145, 90, 0.18)';
+      ctx.lineWidth = 1 + Math.random() * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.bezierCurveTo(340, gy + (Math.random() - 0.5) * 4, 680, gy + (Math.random() - 0.5) * 4, 1024, gy);
+      ctx.stroke();
+    }
+
+    // Deep dark shadow expansion gap between planks
+    ctx.fillStyle = '#1c1109';
+    ctx.fillRect(0, y + bh, 1024, gapH);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Photorealistic Golden Sunset Ocean Beach Horizon for 4K OLED TV
+ */
+export function createSunsetBeachCanvas() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 576;
+  const ctx = canvas.getContext('2d');
+
+  // Sky gradient from deep amber to golden dusk
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.65);
+  skyGrad.addColorStop(0, '#32232a');
+  skyGrad.addColorStop(0.35, '#8c4832');
+  skyGrad.addColorStop(0.65, '#d96c34');
+  skyGrad.addColorStop(0.88, '#f7a852');
+  skyGrad.addColorStop(1.0, '#fed88b');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height * 0.65);
+
+  // Soft atmospheric clouds
+  for (let c = 0; c < 8; c++) {
+    const cy = 60 + c * 35;
+    const cGrad = ctx.createLinearGradient(0, cy, 0, cy + 28);
+    cGrad.addColorStop(0, 'rgba(120, 60, 50, 0.35)');
+    cGrad.addColorStop(1, 'rgba(230, 140, 80, 0.15)');
+    ctx.fillStyle = cGrad;
+    ctx.fillRect(0, cy, canvas.width, 24);
+  }
+
+  // Brilliant low golden sun at horizon
+  const sunX = canvas.width * 0.50;
+  const sunY = canvas.height * 0.64;
+  const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 180);
+  sunGrad.addColorStop(0, '#ffffff');
+  sunGrad.addColorStop(0.2, '#fff4cc');
+  sunGrad.addColorStop(0.45, '#fba442');
+  sunGrad.addColorStop(0.8, 'rgba(245, 130, 50, 0.3)');
+  sunGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = sunGrad;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 180, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ocean Water & Horizon
+  const seaY = canvas.height * 0.65;
+  const seaH = canvas.height - seaY;
+  const seaGrad = ctx.createLinearGradient(0, seaY, 0, canvas.height);
+  seaGrad.addColorStop(0, '#42281e');
+  seaGrad.addColorStop(0.25, '#352119');
+  seaGrad.addColorStop(0.6, '#261814');
+  seaGrad.addColorStop(1.0, '#170f0d');
+  ctx.fillStyle = seaGrad;
+  ctx.fillRect(0, seaY, canvas.width, seaH);
+
+  // Shimmering Golden Sun Glare on Ocean Surface
+  for (let s = 0; s < 50; s++) {
+    const sy = seaY + Math.pow(s / 50, 1.4) * seaH;
+    const spread = (sy - seaY) * 1.6 + 40;
+    const alpha = 0.55 - (s / 50) * 0.45;
+    ctx.fillStyle = `rgba(255, 230, 160, ${alpha})`;
+    const barW = 20 + Math.random() * spread;
+    ctx.fillRect(sunX - barW / 2 + (Math.random() - 0.5) * 20, sy, barW, 2.5);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+

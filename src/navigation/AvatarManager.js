@@ -538,15 +538,15 @@ export class AvatarManager {
     if (typeof window !== 'undefined') {
       window.__wolfAvatarManager = this;
     }
-    this.resetAgents(2);
+    this.resetAgents(0);
   }
 
-  resetAgents(count = 2) {
+  resetAgents(count = 0) {
     // Clear existing
     this.agents.forEach(a => a.dispose());
     this.agents = [];
 
-    if (!this.scene) return;
+    if (!this.scene || count <= 0) return;
 
     const agentConfigs = [
       { id: 'sophia', name: 'Sophia (Lead Architect)', color: 0x3d78c2, room: 'salon' },
@@ -561,7 +561,7 @@ export class AvatarManager {
     }
   }
 
-  setCount(count) {
+  setCount(count = 0) {
     this.resetAgents(count);
   }
 
@@ -582,7 +582,7 @@ export class AvatarManager {
 
   onPlanChanged(plan, dimensions) {
     navigationEngine.setPlan(plan, dimensions);
-    this.resetAgents(this.agents.length || 2);
+    this.resetAgents(0);
   }
 
   sendAgentToRoom(agentIndex = 0, roomId) {

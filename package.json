@@ -21,8 +21,20 @@
     "react-dom": "^19.3.0",
     "three": "^0.186.1"
   },
+  "license": "MIT",
+  "keywords": [
+    "threejs",
+    "webgl",
+    "rapier3d",
+    "physics",
+    "architecture",
+    "interior-design",
+    "react",
+    "vite",
+    "3d-editor",
+    "spatial"
+  ],
   "devDependencies": {
-    "puppeteer-core": "^25.13.0",
     "vite": "^8.3.4"
   }
 }

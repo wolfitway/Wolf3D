@@ -157,24 +157,6 @@ export default function UnifiedWalkHud() {
         {/* Right: Master Control Actions */}
         <div className="walk-actions-cluster">
           <button
-            className="walk-ctrl-btn guide-btn"
-            id="walk-focus-guide-btn"
-            title="Focus Camera on VIP Tour Guide Sophia"
-            onClick={() => {
-              if (avatarManager) {
-                const info = avatarManager.getGuideInfo();
-                if (info && info.position && window.__wolfLookAtPos) {
-                  window.__wolfLookAtPos(info.position.x, 1.4, info.position.z);
-                  playChime(750);
-                }
-              }
-            }}
-          >
-            <span className="ctrl-icon">👩‍💼</span>
-            <span className="ctrl-text">Guide</span>
-          </button>
-
-          <button
             className={`walk-ctrl-btn ${isTourActive && !isTourPaused ? 'active' : 'highlight'}`}
             id="walk-autopilot-btn"
             title="Toggle Guided Autopilot Tour [Shortcut: Space]"

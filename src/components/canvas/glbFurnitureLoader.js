@@ -10,8 +10,8 @@ export const GLB_MODEL_MAP = {
   // Lounge & Seating
   'chair-lounge': '/models/chair_lounge.glb',
   'med-chair-lounge': '/models/chair_lounge.glb',
-  'victorian-chair': '/models/generated/victorian_chair.glb',
-  'custom-armchair': '/models/generated/victorian_chair.glb',
+  'victorian-chair': '/models/custom_armchair.glb',
+  'custom-armchair': '/models/custom_armchair.glb',
   'pouf-velvet': '/models/pouf_velvet.glb',
   'med-pouf': '/models/pouf_velvet.glb',
   'chair-dining': '/models/chair_dining.glb',

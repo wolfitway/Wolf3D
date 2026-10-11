@@ -109,10 +109,10 @@ export const PLAN_SPECS = {
 
 export const CAMERA_PRESETS = {
   villa: {
-    overall: { pos: [16.5, 14.0, 15.2], target: [0.5, 1.2, 0] },
+    overall: { pos: [0.0, 2.2, 5.8], target: [-0.2, 1.4, -0.6] },
     joinery: { pos: [4.8, 4.8, -1.8], target: [2.6, 1.3, -1.8] },
     plan: { pos: [0.01, 23.0, 0.01], target: [0, 0, 0] },
-    walk: { pos: [-2.8, 1.65, 1.2], target: [0, 1.65, 0] }
+    walk: { pos: [-0.6, 1.65, 2.8], target: [-0.6, 1.4, -0.6] }
   },
   studio: {
     overall: { pos: [12.5, 9.8, 11.2], target: [0.2, 1.4, -0.2] },
@@ -207,10 +207,10 @@ export const ATMOSPHERE_MOODS = {
 export const ROOM_BOOKMARKS = {
   villa: {
     entrance: { pos: [-5.2, 1.8, 3.8], target: [-1.2, 1.4, 0], name: 'Grand Entrance' },
-    salon: { pos: [-3.4, 1.5, 0.6], target: [-1.0, 1.1, 0.1], name: 'Living Salon' },
+    salon: { pos: [-0.6, 1.5, 2.6], target: [-0.6, 1.2, -0.6], name: 'Living Salon' },
     kitchen: { pos: [1.4, 1.8, -3.2], target: [2.8, 1.1, -1.8], name: "Chef's Island" },
     suite: { pos: [1.2, 1.7, 1.8], target: [3.2, 1.1, 2.2], name: 'Master Suite' },
-    terrace: { pos: [-3.8, 1.8, -1.0], target: [-5.5, 1.8, -1.0], name: 'Sunset Glazing' },
+    terrace: { pos: [0.0, 2.2, 5.8], target: [-0.2, 1.4, -0.6], name: 'Sunset Panoramic Terrace' },
     dollhouse: { pos: [15.5, 13.5, 14.5], target: [0.5, 1.0, 0], name: '3D Dollhouse' }
   },
   studio: {
@@ -501,84 +501,92 @@ export const PROPS_META = {
 
 export const INITIAL_MEDITERRANEAN_PROPS = [
   {
-    id: 'med-cred-1',
-    type: 'med-drawers',
-    name: 'Artisan 3-Drawer Credenza',
-    x: -2.8,
-    y: 0.45,
-    z: -2.8
-  },
-  {
     id: 'med-tbl-dining-1',
     type: 'table-dining',
-    name: 'Rustic Cedar Dining Table',
-    x: 2.8,
+    name: 'Round Scandinavian Oak Dining Table',
+    x: -3.8,
     y: 0.40,
-    z: -0.6
+    z: -1.0
   },
   {
     id: 'med-chair-din-1',
     type: 'chair-dining',
-    name: 'Mediterranean Dining Chair (South)',
-    x: 2.8,
+    name: 'Curved Dining Chair (Front)',
+    x: -3.8,
     y: 0.46,
-    z: 0.1
+    z: -0.2
   },
   {
     id: 'med-chair-din-2',
     type: 'chair-dining',
-    name: 'Mediterranean Dining Chair (North)',
-    x: 2.8,
+    name: 'Curved Dining Chair (Back)',
+    x: -3.8,
     y: 0.46,
-    z: -1.3
+    z: -1.8
+  },
+  {
+    id: 'med-chair-din-3',
+    type: 'chair-dining',
+    name: 'Curved Dining Chair (Right)',
+    x: -3.0,
+    y: 0.46,
+    z: -1.0
+  },
+  {
+    id: 'med-chair-din-4',
+    type: 'chair-dining',
+    name: 'Curved Dining Chair (Window Left)',
+    x: -4.5,
+    y: 0.46,
+    z: -0.6
+  },
+  {
+    id: 'med-chair-din-5',
+    type: 'chair-dining',
+    name: 'Curved Dining Chair (Window Back)',
+    x: -4.5,
+    y: 0.46,
+    z: -1.4
   },
   {
     id: 'med-tbl-coffee-1',
     type: 'table-coffee',
-    name: 'Travertine Stone Coffee Table',
-    x: -2.6,
+    name: 'Round Oak & Travertine Coffee Table',
+    x: -0.6,
     y: 0.22,
     z: 0.0
   },
   {
-    id: 'med-armchair-1',
-    type: 'chair-lounge',
-    name: 'Mediterranean Linen Armchair',
-    x: -1.1,
-    y: 0.42,
-    z: 0.3
-  },
-  {
-    id: 'victorian-armchair-1',
-    type: 'victorian-chair',
-    name: 'Bespoke Tufted Victorian Armchair',
-    x: -3.8,
-    y: 0.49,
-    z: -0.4
-  },
-  {
     id: 'med-nightstand-1',
     type: 'nightstand-drawer',
-    name: 'Bedside Nightstand with Drawer',
-    x: 1.3,
+    name: 'Master Suite Left Nightstand',
+    x: 3.5,
     y: 0.34,
-    z: 2.2
+    z: 1.0
+  },
+  {
+    id: 'med-nightstand-2',
+    type: 'nightstand-drawer',
+    name: 'Master Suite Right Nightstand',
+    x: 3.5,
+    y: 0.34,
+    z: 3.2
   },
   {
     id: 'med-olive-tree-1',
     type: 'prop-plant',
-    name: 'Potted Mediterranean Olive Tree',
-    x: -4.4,
+    name: 'Indoor Fiddle-Leaf Fig Tree',
+    x: -4.5,
     y: 0.90,
-    z: -2.4
+    z: -2.5
   },
   {
     id: 'med-amphora-1',
     type: 'prop-vase',
-    name: 'Terracotta Amphora Urn',
-    x: -1.8,
-    y: 0.32,
-    z: 2.0
+    name: 'Artisan Ceramic Pottery Vessel',
+    x: 2.2,
+    y: 0.60,
+    z: -1.1
   }
 ];
 

@@ -16,8 +16,6 @@ import {
   statusCalloutAtom,
   isBudgetDrawerOpenAtom,
   isDossierModalOpenAtom,
-  isLightFixturesOnAtom,
-  showOutdoorTerraceAtom,
   isStructuralLockedAtom,
   lockedElementIdsAtom,
   isMeasureToolActiveAtom,
@@ -40,10 +38,8 @@ export default function StudioUi() {
   const [roomDimensions, setRoomDimensions] = useAtom(roomDimensionsAtom);
   const [isAudioEnabled, setIsAudioEnabled] = useAtom(isAudioEnabledAtom);
   const [statusCallout, setStatusCallout] = useAtom(statusCalloutAtom);
-  const setIsBudgetDrawerOpen = useSetAtom(isBudgetDrawerOpenAtom);
+  const [isBudgetDrawerOpen, setIsBudgetDrawerOpen] = useAtom(isBudgetDrawerOpenAtom);
   const setIsDossierModalOpen = useSetAtom(isDossierModalOpenAtom);
-  const [isLightFixturesOn, setIsLightFixturesOn] = useAtom(isLightFixturesOnAtom);
-  const [showOutdoorTerrace, setShowOutdoorTerrace] = useAtom(showOutdoorTerraceAtom);
   const [isStructuralLocked, setIsStructuralLocked] = useAtom(isStructuralLockedAtom);
   const setLockedElementIds = useSetAtom(lockedElementIdsAtom);
   const [isMeasureToolActive, setIsMeasureToolActive] = useAtom(isMeasureToolActiveAtom);
@@ -104,17 +100,17 @@ export default function StudioUi() {
     setCameraView(viewKey);
   };
 
-  const handleSpawnCrate = () => {
-    const id = `prop-${Date.now()}`;
-    const x = (Math.random() - 0.5) * (roomDimensions.width * 0.4);
-    const y = 3.0 + Math.random() * 0.4;
-    const z = (Math.random() - 0.5) * (roomDimensions.depth * 0.4);
+  const isBudgetOpen = activeDrawer === 'budget' || isBudgetDrawerOpen;
 
-    const record = physicsEngine.createBody(id, 'crate-wood', x, y, z);
-    if (record) {
-      setSpawnedProps(prev => [...prev, { id, type: 'crate-wood', name: 'Timber Shipping Crate', x, y, z }]);
-      setSelectedPropId(id);
-      playChime(660);
+  const handleToggleBudgetDossier = () => {
+    if (isBudgetOpen) {
+      setActiveDrawer(null);
+      setIsBudgetDrawerOpen(false);
+      playChime(360);
+    } else {
+      setActiveDrawer('budget');
+      setIsBudgetDrawerOpen(true);
+      playChime(560);
     }
   };
 
@@ -310,15 +306,6 @@ export default function StudioUi() {
           <span className="tool-text">Med Suite</span>
         </button>
         <button
-          className="tool-btn highlight"
-          id="spawn-crate-btn"
-          title="Spawn Physics Crate (Drops with Gravity)"
-          onClick={handleSpawnCrate}
-        >
-          <span className="tool-icon">📦</span>
-          <span className="tool-text">Drop Crate</span>
-        </button>
-        <button
           className="tool-btn"
           id="open-catalog-btn"
           title="Open Product & Furniture Catalog"
@@ -335,54 +322,6 @@ export default function StudioUi() {
         >
           <span className="tool-icon">📐</span>
           <span className="tool-text">Room CAD</span>
-        </button>
-        <button
-          className={`tool-btn ${activeDrawer === 'budget' ? 'highlight' : ''}`}
-          id="open-budget-btn"
-          title="Open Live Architectural Investment & Budget Calculator"
-          onClick={() => {
-            setActiveDrawer(activeDrawer === 'budget' ? null : 'budget');
-            playChime(560);
-          }}
-        >
-          <span className="tool-icon">💰</span>
-          <span className="tool-text">Budget ROI</span>
-        </button>
-        <button
-          className="tool-btn"
-          id="open-dossier-btn"
-          title="Generate One-Click Architectural Proposal Dossier"
-          onClick={() => {
-            setIsDossierModalOpen(true);
-            playChime(680);
-          }}
-        >
-          <span className="tool-icon">📑</span>
-          <span className="tool-text">Dossier</span>
-        </button>
-        <button
-          className={`tool-btn ${showOutdoorTerrace ? 'highlight' : ''}`}
-          id="toggle-terrace-btn"
-          title="Toggle Cantilevered Timber Terrace & Infinity Pool"
-          onClick={() => {
-            setShowOutdoorTerrace(!showOutdoorTerrace);
-            playChime(600);
-          }}
-        >
-          <span className="tool-icon">🏊</span>
-          <span className="tool-text">Terrace</span>
-        </button>
-        <button
-          className={`tool-btn ${isLightFixturesOn ? 'highlight' : ''}`}
-          id="toggle-lights-btn"
-          title="Toggle Interior Fixture Lighting & Hearth Flames"
-          onClick={() => {
-            setIsLightFixturesOn(!isLightFixturesOn);
-            playChime(640);
-          }}
-        >
-          <span className="tool-icon">{isLightFixturesOn ? '💡' : '🌑'}</span>
-          <span className="tool-text">Lights</span>
         </button>
         <button
           className={`tool-btn ${showDimensions ? 'highlight' : ''}`}
@@ -510,6 +449,19 @@ export default function StudioUi() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Architectural Budget & Investment Dossier Button (Bottom Right) */}
+      <div className="budget-dossier-fab-container">
+        <button
+          className={`budget-dossier-fab-btn ${isBudgetOpen ? 'active' : ''}`}
+          id="budget-dossier-fab-btn"
+          title="Open Architectural Investment Budget & Dossier"
+          onClick={handleToggleBudgetDossier}
+        >
+          <span className="fab-dollar-badge">$</span>
+          <span className="fab-label">Budget Dossier</span>
+        </button>
+      </div>
     </div>
   );
 }

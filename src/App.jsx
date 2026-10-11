@@ -18,7 +18,6 @@ import SnapshotFlash from './components/ui/SnapshotFlash';
 import HotspotTooltip from './components/ui/HotspotTooltip';
 import ItemTransformHud from './components/ui/ItemTransformHud';
 import BlenderGrabBanner from './components/ui/BlenderGrabBanner';
-import NavigationPeopleHud from './components/ui/NavigationPeopleHud';
 import MasterModeSwitcher from './components/ui/MasterModeSwitcher';
 import StudioUi from './components/ui/StudioUi';
 import PresentationUi from './components/ui/PresentationUi';
@@ -111,7 +110,6 @@ export default function App() {
       <HotspotTooltip />
       <ItemTransformHud />
       <BlenderGrabBanner />
-      <NavigationPeopleHud />
       <ArchicadPlanHud />
 
       {/* Master UI Overlay Layer */}
