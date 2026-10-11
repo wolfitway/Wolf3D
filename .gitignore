@@ -1,5 +1,49 @@
+# Node dependencies & build
 node_modules/
 dist/
+
+# Python Virtual Environments (CRITICAL: exclude 6GB+ local venvs)
+venv/
+.venv/
+env/
+scripts/ai_engine/venv/
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Model weights, checkpoints & Hugging Face caches (never commit large binaries)
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+checkpoints/
+models_cache/
+.cache/
+scripts/ai_engine/weights/
+scripts/ai_engine/TripoSR/
+scripts/ai_engine/Hunyuan3D*/
+scripts/ai_engine/hunyuan3d*/
+
+# Generated 3D runtime models (keep folder via .gitkeep, ignore generated outputs)
+public/models/generated/*
+!public/models/generated/.gitkeep
+
+# System & Editor files
 .DS_Store
+Thumbs.db
 *.log
 .tempmediaStorage/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+.env.*.local

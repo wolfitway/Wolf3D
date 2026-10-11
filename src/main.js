@@ -50,7 +50,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerP
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
 container.appendChild(renderer.domElement);
@@ -499,6 +499,7 @@ function loadHousePlan(planId) {
   document.getElementById('readout-area').innerHTML = `${area} M&sup2;`;
   document.getElementById('readout-volume').innerHTML = `${volume} M&sup3;`;
 
+  // Update Studio Meta Specs
   if (planId === 'villa') {
     document.getElementById('room-meta-specs').innerHTML = `VILLA SUITE &bull; ${roomWidth.toFixed(1)} &times; ${roomDepth.toFixed(1)} &bull; ${area} M&sup2;`;
     document.getElementById('callout-text').innerHTML = `Villa Architecture &bull; Living Salon, Kitchen & Master Suite with Walkable Portals`;
@@ -511,6 +512,25 @@ function loadHousePlan(planId) {
     document.getElementById('room-meta-specs').innerHTML = `OPEN LOFT &bull; ${roomWidth.toFixed(1)} &times; ${roomDepth.toFixed(1)} &bull; ${area} M&sup2;`;
     document.getElementById('callout-text').innerHTML = `Open Industrial Loft &bull; Exposed Column & Split Creative Studio`;
     document.getElementById('readout-doors').innerHTML = `Open Plan Archway`;
+  }
+
+  // Update Presentation HUD Title & Stats
+  const presTitle = document.getElementById('pres-title');
+  const statArea = document.getElementById('pres-stat-area');
+  const statHeight = document.getElementById('pres-stat-height');
+  const statDaylight = document.getElementById('pres-stat-daylight');
+  if (statArea) statArea.innerHTML = `${area} M&sup2;`;
+  if (statHeight) statHeight.innerHTML = `${wallHeight.toFixed(1)} M`;
+
+  if (planId === 'villa') {
+    if (presTitle) presTitle.innerHTML = `Project Villa Lumina <span class="pres-subtitle" id="pres-subtitle">&bull; Executive Residence</span>`;
+    if (statDaylight) statDaylight.innerHTML = `94%`;
+  } else if (planId === 'studio') {
+    if (presTitle) presTitle.innerHTML = `Project Atelier Micro <span class="pres-subtitle" id="pres-subtitle">&bull; Adaptive Studio</span>`;
+    if (statDaylight) statDaylight.innerHTML = `89%`;
+  } else {
+    if (presTitle) presTitle.innerHTML = `Project Tribeca Loft <span class="pres-subtitle" id="pres-subtitle">&bull; Creative Penthouse</span>`;
+    if (statDaylight) statDaylight.innerHTML = `98%`;
   }
 
   // Update Top Bar & CAD drawer active buttons
@@ -527,11 +547,30 @@ function loadHousePlan(planId) {
   // Apply current visual style colors
   applyStyle(currentStyleKey);
 
-  // Smooth camera reposition if not currently in walk mode
+  // Update Blueprint Minimap Plan Label
+  const minimapPlanLabel = document.getElementById('minimap-plan-label');
+  if (minimapPlanLabel) {
+    minimapPlanLabel.textContent = planId === 'villa' ? 'VILLA SUITE' : (planId === 'studio' ? 'URBAN STUDIO' : 'ATELIER LOFT');
+  }
+
+  // Initialize Custom Tour Moves for this plan
+  if (typeof initTourMoves === 'function') {
+    initTourMoves();
+  }
+
+  // Rebuild Hotspots & Dimension lines
+  if (typeof buildHotspots === 'function') buildHotspots();
+  if (typeof buildDimensionRulers === 'function') buildDimensionRulers();
+
+  // Smooth camera reposition if not currently in walk mode and in studio
   if (currentCameraMode !== 'walk') {
-    const preset = CAMERA_PRESETS[currentCameraMode] || CAMERA_PRESETS.overall;
-    gsap.to(camera.position, { ...preset.pos, duration: 1.2, ease: 'power2.inOut' });
-    gsap.to(controls.target, { ...preset.target, duration: 1.2, ease: 'power2.inOut' });
+    if (currentAppMode === 'presentation') {
+      goToBookmark('entrance');
+    } else {
+      const preset = CAMERA_PRESETS[currentCameraMode] || CAMERA_PRESETS.overall;
+      gsap.to(camera.position, { ...preset.pos, duration: 1.2, ease: 'power2.inOut' });
+      gsap.to(controls.target, { ...preset.target, duration: 1.2, ease: 'power2.inOut' });
+    }
   }
 }
 
@@ -1106,15 +1145,113 @@ function buildLoftPlan() {
 }
 
 // ============================================================================
-// DYNAMIC RAPIER PHYSICS OBJECT SPAWNER
+// DYNAMIC RAPIER PHYSICS OBJECT SPAWNER & EASY-MOVING SELECTION SYSTEM
 // ============================================================================
 
-function spawnPhysicsObject(type = 'crate-wood', spawnPos = null) {
-  if (!physicsWorld) return;
+const PROPS_META = {
+  'chair-lounge': { name: 'Nordic Minimalist Armchair' },
+  'pouf-velvet': { name: 'Modular Ottoman Pouf' },
+  'table-coffee': { name: 'Sculptural Marble Coffee Table' },
+  'prop-vase': { name: 'Terracotta Sculptural Vase' },
+  'prop-plant': { name: 'Fiddle Leaf Fig Planter' },
+  'prop-cat': { name: 'Architectural Ceramic Figurine' },
+  'crate-wood': { name: 'Nordic Timber Modular Crate' },
+  'crate-industrial': { name: 'Industrial Steel Vault Crate' },
+  'crate-stack': { name: 'Triple Crate Stack' }
+};
 
-  const px = spawnPos ? spawnPos.x : (Math.random() - 0.5) * 3.0;
-  const py = spawnPos ? spawnPos.y : 3.2 + Math.random() * 0.5;
-  const pz = spawnPos ? spawnPos.z : (Math.random() - 0.5) * 2.5;
+// 3D Selection Ring Visual (Floats right on the floor beneath selected object)
+const ringGeo = new THREE.RingGeometry(0.36, 0.44, 32);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xdfb15b, side: THREE.DoubleSide, transparent: true, opacity: 0.92 });
+const selectionRing = new THREE.Mesh(ringGeo, ringMat);
+selectionRing.rotation.x = -Math.PI / 2;
+selectionRing.position.y = 0.02;
+selectionRing.visible = false;
+scene.add(selectionRing);
+
+let selectedObject = null;
+const transformHud = document.getElementById('item-transform-hud');
+const hudItemName = document.getElementById('hud-item-name');
+
+function selectObject(obj) {
+  if (!obj) return;
+  selectedObject = obj;
+  if (hudItemName) hudItemName.textContent = obj.name || 'Selected Piece';
+  if (transformHud) {
+    transformHud.classList.add('visible');
+    transformHud.classList.add('active');
+  }
+  selectionRing.position.x = obj.mesh.position.x;
+  selectionRing.position.z = obj.mesh.position.z;
+  selectionRing.visible = true;
+  playChime(660);
+}
+
+function deselectObject() {
+  selectedObject = null;
+  if (transformHud) {
+    transformHud.classList.remove('visible');
+    transformHud.classList.remove('active');
+  }
+  selectionRing.visible = false;
+}
+
+function rotateSelectedObject() {
+  if (!selectedObject) return;
+  const curRot = selectedObject.body.rotation();
+  const curQ = new THREE.Quaternion(curRot.x, curRot.y, curRot.z, curRot.w);
+  const rotStep = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 4);
+  curQ.multiply(rotStep);
+  selectedObject.body.setRotation({ x: curQ.x, y: curQ.y, z: curQ.z, w: curQ.w }, true);
+  selectedObject.mesh.quaternion.copy(curQ);
+  playChime(740);
+}
+
+function dropSettleSelectedObject() {
+  if (!selectedObject) return;
+  selectedObject.body.setLinvel({ x: 0, y: -0.9, z: 0 }, true);
+  selectedObject.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  selectedObject.body.wakeUp();
+  playChime(440);
+}
+
+function duplicateSelectedObject() {
+  if (!selectedObject) return;
+  const pos = selectedObject.mesh.position;
+  const halfW = roomWidth / 2 - 0.55;
+  const halfD = roomDepth / 2 - 0.55;
+  const newX = Math.max(-halfW, Math.min(halfW, pos.x + 0.5));
+  const newZ = Math.max(-halfD, Math.min(halfD, pos.z + 0.5));
+
+  const clone = spawnPhysicsObject(selectedObject.type, { x: newX, y: pos.y + 0.35, z: newZ });
+  if (clone) selectObject(clone);
+  playChime(784);
+}
+
+function deleteSelectedObject() {
+  if (!selectedObject) return;
+  scene.remove(selectedObject.mesh);
+  selectedObject.mesh.geometry.dispose();
+  if (physicsWorld) physicsWorld.removeRigidBody(selectedObject.body);
+  const idx = physicsObjects.indexOf(selectedObject);
+  if (idx !== -1) physicsObjects.splice(idx, 1);
+  deselectObject();
+  playChime(330);
+}
+
+// Bind Contextual Transform HUD Action Buttons
+document.getElementById('hud-rotate-btn').addEventListener('click', rotateSelectedObject);
+document.getElementById('hud-drop-btn').addEventListener('click', dropSettleSelectedObject);
+document.getElementById('hud-duplicate-btn').addEventListener('click', duplicateSelectedObject);
+document.getElementById('hud-delete-btn').addEventListener('click', deleteSelectedObject);
+document.getElementById('hud-deselect-btn').addEventListener('click', deselectObject);
+
+function spawnPhysicsObject(type = 'crate-wood', spawnPos = null) {
+  if (!physicsWorld) return null;
+
+  const px = spawnPos ? spawnPos.x : (Math.random() - 0.5) * (roomWidth * 0.4);
+  const py = spawnPos ? spawnPos.y : 3.0 + Math.random() * 0.4;
+  const pz = spawnPos ? spawnPos.z : (Math.random() - 0.5) * (roomDepth * 0.4);
 
   let mesh = null;
   let colliderDesc = null;
@@ -1131,8 +1268,7 @@ function spawnPhysicsObject(type = 'crate-wood', spawnPos = null) {
   } else if (type === 'crate-stack') {
     spawnPhysicsObject('crate-wood', { x: px, y: 1.0, z: pz });
     spawnPhysicsObject('crate-wood', { x: px, y: 1.6, z: pz });
-    spawnPhysicsObject('crate-industrial', { x: px, y: 2.2, z: pz });
-    return;
+    return spawnPhysicsObject('crate-industrial', { x: px, y: 2.2, z: pz });
   } else if (type === 'chair-lounge') {
     const w = 0.55, h = 0.65, d = 0.55;
     mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materials.cushionCream);
@@ -1166,10 +1302,14 @@ function spawnPhysicsObject(type = 'crate-wood', spawnPos = null) {
   const rigidBody = physicsWorld.createRigidBody(bodyDesc);
   const collider = physicsWorld.createCollider(colliderDesc, rigidBody);
 
-  physicsObjects.push({ mesh, body: rigidBody, collider });
+  const metaName = (PROPS_META[type] && PROPS_META[type].name) || 'Architectural Prop';
+  const itemObj = { mesh, body: rigidBody, collider, type, name: metaName };
+  physicsObjects.push(itemObj);
+  return itemObj;
 }
 
 function clearPhysicsObjects() {
+  deselectObject();
   physicsObjects.forEach(obj => {
     scene.remove(obj.mesh);
     obj.mesh.geometry.dispose();
@@ -1189,36 +1329,114 @@ const planeIntersect = new THREE.Vector3();
 
 window.addEventListener('pointerdown', (e) => {
   if (currentCameraMode === 'walk') return;
+  // Ignore clicks on UI overlay panels, HUDs, or modals
+  if (e.target.closest('#item-transform-hud') ||
+      e.target.closest('.modal') ||
+      e.target.closest('.tour-director-modal') ||
+      e.target.closest('.panel-drawer') ||
+      e.target.closest('.info-drawer') ||
+      e.target.closest('.master-mode-switcher-bar') ||
+      e.target.closest('.pres-bottom-bar') ||
+      e.target.closest('.pres-header') ||
+      e.target.closest('.pres-tour-player') ||
+      e.target.closest('.pres-spec-modal') ||
+      e.target.closest('.top-bar') ||
+      e.target.closest('.bottom-bar') ||
+      e.target.closest('.quick-toolbar') ||
+      e.target.closest('.status-callout') ||
+      e.target.closest('.pres-minimap')) {
+    return;
+  }
+
+  // Smoothly close any open slide-out drawers if clicking into 3D scene
+  if (typeof closeAllDrawers === 'function') {
+    closeAllDrawers();
+  }
+
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
-  const meshes = physicsObjects.map(o => o.mesh);
-  const intersects = raycaster.intersectObjects(meshes);
-  if (intersects.length > 0) {
-    const hitMesh = intersects[0].object;
-    const item = physicsObjects.find(o => o.mesh === hitMesh);
-    if (item) {
-      draggedBody = item.body;
-      controls.enabled = false;
-      dragPlane.constant = -intersects[0].point.y;
+  // In Presentation mode, check hotspot clicks first
+  if (currentAppMode === 'presentation' && hotspotColliders.length > 0) {
+    const hsHits = raycaster.intersectObjects(hotspotColliders);
+    if (hsHits.length > 0) {
+      const hs = hsHits[0].object.userData.hotspot;
+      if (hs) {
+        openSpecModal(hs);
+        return;
+      }
+    }
+  }
+
+  // In Studio mode, allow clicking and dragging physics objects
+  if (currentAppMode === 'studio') {
+    const meshes = physicsObjects.map(o => o.mesh);
+    const intersects = raycaster.intersectObjects(meshes);
+    if (intersects.length > 0) {
+      const hitMesh = intersects[0].object;
+      const item = physicsObjects.find(o => o.mesh === hitMesh);
+      if (item) {
+        selectObject(item);
+        draggedBody = item.body;
+        controls.enabled = false;
+        dragPlane.constant = -intersects[0].point.y;
+        return;
+      }
+    } else {
+      // Clicked on empty diorama floor
+      deselectObject();
     }
   }
 });
 
 window.addEventListener('pointermove', (e) => {
+  // Hotspot hover tooltip in Presentation mode
+  if (currentAppMode === 'presentation' && currentCameraMode !== 'walk' && hotspotColliders.length > 0) {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const hsHits = raycaster.intersectObjects(hotspotColliders);
+    const tooltip = document.getElementById('hotspot-tooltip');
+    if (hsHits.length > 0) {
+      document.body.style.cursor = 'pointer';
+      const hs = hsHits[0].object.userData.hotspot;
+      if (hs && tooltip) {
+        document.getElementById('tooltip-title').textContent = hs.title;
+        document.getElementById('tooltip-meta').innerHTML = hs.kicker;
+        tooltip.style.left = `${e.clientX}px`;
+        tooltip.style.top = `${e.clientY}px`;
+        tooltip.classList.add('visible');
+      }
+    } else {
+      document.body.style.cursor = 'default';
+      if (tooltip) tooltip.classList.remove('visible');
+    }
+  }
+
   if (!draggedBody) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
 
   if (raycaster.ray.intersectPlane(dragPlane, planeIntersect)) {
-    draggedBody.setNextKinematicTranslation({
-      x: planeIntersect.x,
-      y: Math.max(0.3, planeIntersect.y + 0.3),
-      z: planeIntersect.z
-    });
+    const halfW = roomWidth / 2 - 0.45;
+    const halfD = roomDepth / 2 - 0.45;
+    const clampedX = Math.max(-halfW, Math.min(halfW, planeIntersect.x));
+    const clampedZ = Math.max(-halfD, Math.min(halfD, planeIntersect.z));
+
+    draggedBody.setTranslation({
+      x: clampedX,
+      y: Math.max(0.3, planeIntersect.y + 0.2),
+      z: clampedZ
+    }, true);
     draggedBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    draggedBody.wakeUp();
+
+    if (selectionRing) {
+      selectionRing.position.set(clampedX, 0.02, clampedZ);
+    }
   }
 });
 
@@ -1226,6 +1444,9 @@ window.addEventListener('pointerup', () => {
   if (draggedBody) {
     draggedBody = null;
     controls.enabled = true;
+    if (selectedObject) {
+      selectedObject.body.wakeUp();
+    }
   }
 });
 
@@ -1386,6 +1607,7 @@ function setMode(index) {
   currentModeIndex = index;
   const mode = MODES[index];
   document.querySelectorAll('.mode-tab').forEach((tab, i) => tab.classList.toggle('active', i === index));
+  document.querySelectorAll('.pres-scen-pill').forEach((pill, i) => pill.classList.toggle('active', i === index));
   const percent = (index / (MODES.length - 1)) * 100;
   document.getElementById('scrubber-progress').style.width = `${percent}%`;
   document.getElementById('scrubber-thumb').style.left = `${percent}%`;
@@ -1430,19 +1652,54 @@ document.getElementById('next-btn').addEventListener('click', () => {
 
 // Physics Controls
 document.getElementById('spawn-crate-btn').addEventListener('click', () => {
-  spawnPhysicsObject('crate-wood');
+  const item = spawnPhysicsObject('crate-wood');
+  if (item) selectObject(item);
 });
 
 document.getElementById('clear-physics-btn').addEventListener('click', clearPhysicsObjects);
 
-// Catalog Drawer
+// Slide-Out Drawers & Modals
 const catalogDrawer = document.getElementById('catalog-drawer');
-document.getElementById('open-catalog-btn').addEventListener('click', () => catalogDrawer.classList.toggle('open'));
-document.getElementById('close-catalog-btn').addEventListener('click', () => catalogDrawer.classList.remove('open'));
+const cadDrawer = document.getElementById('cad-drawer');
+const infoDrawer = document.getElementById('info-drawer');
+const drawerBackdrop = document.getElementById('drawer-backdrop');
+
+function updateDrawerBackdrop() {
+  const isAnyOpen = (catalogDrawer && catalogDrawer.classList.contains('open')) ||
+                    (cadDrawer && cadDrawer.classList.contains('open')) ||
+                    (infoDrawer && infoDrawer.classList.contains('open'));
+  if (drawerBackdrop) {
+    drawerBackdrop.classList.toggle('active', isAnyOpen);
+  }
+}
+
+function closeAllDrawers() {
+  if (catalogDrawer) catalogDrawer.classList.remove('open');
+  if (cadDrawer) cadDrawer.classList.remove('open');
+  if (infoDrawer) infoDrawer.classList.remove('open');
+  if (drawerBackdrop) drawerBackdrop.classList.remove('active');
+}
+
+if (drawerBackdrop) {
+  drawerBackdrop.addEventListener('click', closeAllDrawers);
+}
+
+// Catalog Drawer
+document.getElementById('open-catalog-btn').addEventListener('click', () => {
+  if (cadDrawer) cadDrawer.classList.remove('open');
+  if (infoDrawer) infoDrawer.classList.remove('open');
+  catalogDrawer.classList.toggle('open');
+  updateDrawerBackdrop();
+});
+document.getElementById('close-catalog-btn').addEventListener('click', () => {
+  catalogDrawer.classList.remove('open');
+  updateDrawerBackdrop();
+});
 
 document.querySelectorAll('.catalog-card').forEach(card => {
   card.addEventListener('click', () => {
-    spawnPhysicsObject(card.dataset.spawn);
+    const item = spawnPhysicsObject(card.dataset.spawn);
+    if (item) selectObject(item);
   });
 });
 
@@ -1469,9 +1726,16 @@ document.getElementById('curtain-shoji').addEventListener('click', (e) => {
 });
 
 // Parametric Room CAD Drawer
-const cadDrawer = document.getElementById('cad-drawer');
-document.getElementById('open-cad-btn').addEventListener('click', () => cadDrawer.classList.toggle('open'));
-document.getElementById('close-cad-btn').addEventListener('click', () => cadDrawer.classList.remove('open'));
+document.getElementById('open-cad-btn').addEventListener('click', () => {
+  if (catalogDrawer) catalogDrawer.classList.remove('open');
+  if (infoDrawer) infoDrawer.classList.remove('open');
+  cadDrawer.classList.toggle('open');
+  updateDrawerBackdrop();
+});
+document.getElementById('close-cad-btn').addEventListener('click', () => {
+  cadDrawer.classList.remove('open');
+  updateDrawerBackdrop();
+});
 
 const widthSlider = document.getElementById('room-width-slider');
 const depthSlider = document.getElementById('room-depth-slider');
@@ -1507,9 +1771,1172 @@ document.getElementById('reset-cad-btn').addEventListener('click', () => {
 });
 
 // Info Modal
-const infoDrawer = document.getElementById('info-drawer');
-document.getElementById('info-btn').addEventListener('click', () => infoDrawer.classList.toggle('open'));
-document.getElementById('close-drawer-btn').addEventListener('click', () => infoDrawer.classList.remove('open'));
+document.getElementById('info-btn').addEventListener('click', () => {
+  if (catalogDrawer) catalogDrawer.classList.remove('open');
+  if (cadDrawer) cadDrawer.classList.remove('open');
+  infoDrawer.classList.toggle('open');
+  updateDrawerBackdrop();
+});
+document.getElementById('close-drawer-btn').addEventListener('click', () => {
+  infoDrawer.classList.remove('open');
+  updateDrawerBackdrop();
+});
+
+// ============================================================================
+// AUDIO SYSTEM (WEB AUDIO API SYNTHESIZER)
+// ============================================================================
+let audioCtx = null;
+let isAudioEnabled = false;
+let ambientGain = null;
+let ambientOsc1 = null;
+let ambientOsc2 = null;
+let lastFootstepTime = 0;
+
+function initAudioEngine() {
+  if (audioCtx) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AudioContext();
+
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+  masterGain.connect(audioCtx.destination);
+
+  ambientGain = audioCtx.createGain();
+  ambientGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+  ambientGain.connect(masterGain);
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(280, audioCtx.currentTime);
+  filter.Q.setValueAtTime(3.2, audioCtx.currentTime);
+  filter.connect(ambientGain);
+
+  ambientOsc1 = audioCtx.createOscillator();
+  ambientOsc1.type = 'triangle';
+  ambientOsc1.frequency.setValueAtTime(110, audioCtx.currentTime); // A2
+
+  ambientOsc2 = audioCtx.createOscillator();
+  ambientOsc2.type = 'sine';
+  ambientOsc2.frequency.setValueAtTime(164.81, audioCtx.currentTime); // E3
+
+  const lfo = audioCtx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.setValueAtTime(0.12, audioCtx.currentTime);
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.setValueAtTime(90, audioCtx.currentTime);
+  lfo.connect(lfoGain);
+  lfoGain.connect(filter.frequency);
+
+  ambientOsc1.connect(filter);
+  ambientOsc2.connect(filter);
+
+  ambientOsc1.start();
+  ambientOsc2.start();
+  lfo.start();
+}
+
+function setAudioMute(enable) {
+  if (enable && !audioCtx) {
+    initAudioEngine();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  isAudioEnabled = enable;
+  if (ambientGain && audioCtx) {
+    ambientGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    ambientGain.gain.linearRampToValueAtTime(enable ? 0.35 : 0.0001, audioCtx.currentTime + 0.6);
+  }
+  updateSoundUI();
+}
+
+function updateSoundUI() {
+  const iconMuted = document.getElementById('sound-icon-muted');
+  const iconOn = document.getElementById('sound-icon-on');
+  const presIcon = document.getElementById('pres-sound-icon');
+  if (iconMuted && iconOn) {
+    iconMuted.style.display = isAudioEnabled ? 'none' : 'block';
+    iconOn.style.display = isAudioEnabled ? 'block' : 'none';
+  }
+  if (presIcon) {
+    presIcon.textContent = isAudioEnabled ? '🔊' : '🎵';
+  }
+}
+
+function playChime(freq = 587.33) {
+  if (!isAudioEnabled || !audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.14, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.9);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.9);
+}
+
+function triggerFootstepSound() {
+  if (!isAudioEnabled || !audioCtx) return;
+  const now = performance.now();
+  if (now - lastFootstepTime < 380) return;
+  lastFootstepTime = now;
+
+  const osc = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(85, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(32, audioCtx.currentTime + 0.08);
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(160, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.09, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.09);
+}
+
+document.getElementById('sound-btn').addEventListener('click', () => setAudioMute(!isAudioEnabled));
+document.getElementById('pres-sound-btn').addEventListener('click', () => setAudioMute(!isAudioEnabled));
+
+// ============================================================================
+// 3D ARCHITECTURAL HOTSPOTS & MATERIAL SPECIFICATIONS
+// ============================================================================
+const hotspotsGroup = new THREE.Group();
+scene.add(hotspotsGroup);
+const hotspotColliders = [];
+
+const HOTSPOTS_DATA = [
+  // Villa Hotspots
+  {
+    id: 'hs-marble',
+    plan: 'villa',
+    title: 'Calacatta Viola Marble Island',
+    kicker: 'NATURAL STONE // GOURMET ISLAND',
+    pos: new THREE.Vector3(2.8, 1.15, -1.8),
+    narrative: 'Monolithic sculptural kitchen island featuring dramatic burgundy-violet veining on a warm cream ground. Honed matte finish with invisible stain-resistant nanocoating and mitered waterfall edges.',
+    prov: 'Carrara, Italy',
+    finish: 'Low-Sheen Honed (12 GU)',
+    thermal: 'High Thermal Mass Buffer',
+    sustain: 'Zero-VOC &bull; EPD Certified',
+    camPos: new THREE.Vector3(1.6, 1.6, -2.8),
+    camTarget: new THREE.Vector3(2.8, 1.1, -1.8)
+  },
+  {
+    id: 'hs-oak',
+    plan: 'villa',
+    title: 'French White Oak Chevron Parquet',
+    kicker: 'ARCHITECTURAL FLOORING // LIVING SALON',
+    pos: new THREE.Vector3(-2.8, 0.22, 0.2),
+    narrative: 'Precision 45-degree chevron parquet in sustainably harvested French White Oak. Acoustic underlay dampens footfall while UV-cured oil finish enhances organic grain bounce.',
+    prov: 'Burgundy, France',
+    finish: 'Natural Ultra-Matte Oil',
+    thermal: 'Radiant In-Slab Ready',
+    sustain: 'FSC 100% &bull; Low Carbon',
+    camPos: new THREE.Vector3(-2.8, 1.25, 1.4),
+    camTarget: new THREE.Vector3(-2.8, 0.0, 0.2)
+  },
+  {
+    id: 'hs-partition',
+    plan: 'villa',
+    title: 'Concealed Kinematic Pocket Portals',
+    kicker: 'ADAPTIVE JOINERY // PARTITION SUITE',
+    pos: new THREE.Vector3(0, 1.8, -0.75),
+    narrative: 'Ceiling-recessed motorized sliding portals with acoustic drop seals. Enables fluid transitions between open entertainment mode and private retreat zones.',
+    prov: 'Milan, Italy',
+    finish: 'Fluted Smoked Oak & Slate',
+    thermal: 'Rw 42 dB Sound Isolation',
+    sustain: 'Modular Circular System',
+    camPos: new THREE.Vector3(-1.4, 1.7, -0.75),
+    camTarget: new THREE.Vector3(0.2, 1.6, -0.75)
+  },
+  {
+    id: 'hs-glazing',
+    plan: 'villa',
+    title: 'Panoramic Low-E Curtain Wall',
+    kicker: 'ARCHITECTURAL ENVELOPE // WEST VISTA',
+    pos: new THREE.Vector3(-5.35, 1.8, -1.0),
+    narrative: 'Minimalist structural triple-glazing with thermally broken concealed aluminum profiles. Specially calibrated for maximum natural daylight transmittance (94%) with minimal solar heat gain.',
+    prov: 'Schüco Engineered',
+    finish: 'Anodized Dark Bronze',
+    thermal: 'U-Value 0.78 W/m²K',
+    sustain: 'Cradle-to-Cradle Silver',
+    camPos: new THREE.Vector3(-3.8, 1.8, -1.0),
+    camTarget: new THREE.Vector3(-5.5, 1.8, -1.0)
+  },
+  {
+    id: 'hs-bed',
+    plan: 'villa',
+    title: 'Bespoke Floating King Suite & Headboard',
+    kicker: 'PRIVATE SANCTUARY // MASTER SUITE',
+    pos: new THREE.Vector3(3.2, 0.85, 2.2),
+    narrative: 'Cantilevered platform bed in natural linen upholstery with integrated dimmable reading lights, acoustic fluted headboard paneling, and floating nightstands.',
+    prov: 'Atelier Crafted',
+    finish: 'Bouclé & Slatted Walnut',
+    thermal: 'OEKO-TEX Organic Linen',
+    sustain: 'Biodegradable Textiles',
+    camPos: new THREE.Vector3(1.8, 1.6, 1.6),
+    camTarget: new THREE.Vector3(3.2, 1.0, 2.2)
+  },
+  // Studio Hotspots
+  {
+    id: 'hs-murphy',
+    plan: 'studio',
+    title: 'Kinetic Counterbalanced Wall-Bed',
+    kicker: 'TRANSFORMATIVE ARCHITECTURE // MICRO SUITE',
+    pos: new THREE.Vector3(2.4, 1.6, -0.8),
+    narrative: 'Gas-piston motorized bed assembly that folds flush into architectural millwork, seamlessly converting the sleeping quarter into a morning executive workstation.',
+    prov: 'Hafele Hardware Engine',
+    finish: 'Light Natural Ash',
+    thermal: 'High-Durability Pivot Mechanism',
+    sustain: 'Optimized Micro-Living Footprint',
+    camPos: new THREE.Vector3(0.6, 1.8, 0.8),
+    camTarget: new THREE.Vector3(2.4, 1.4, -0.8)
+  },
+  {
+    id: 'hs-studio-desk',
+    plan: 'studio',
+    title: 'Ergonomic Fold-Down Workstation',
+    kicker: 'WORK INTEGRATION // 08:30 AM FOCUS',
+    pos: new THREE.Vector3(2.4, 0.9, 0.7),
+    narrative: 'Dual-purpose cantilevered desk with integrated cable management, ambient task lighting, and acoustic fabric backdrop.',
+    prov: 'Atelier Studio Custom',
+    finish: 'Matte Linoleum & Oak',
+    thermal: 'Anti-Static Work Surface',
+    sustain: 'FSC Solid Timber Core',
+    camPos: new THREE.Vector3(1.2, 1.6, 1.2),
+    camTarget: new THREE.Vector3(2.4, 1.0, 0.7)
+  },
+  // Loft Hotspots
+  {
+    id: 'hs-column',
+    plan: 'loft',
+    title: 'Board-Formed Architectural Concrete Column',
+    kicker: 'STRUCTURAL CORE // INDUSTRIAL LOFT',
+    pos: new THREE.Vector3(0, 1.9, 0),
+    narrative: 'Exposed structural brutalist column showing raw timber grain formwork impressions, anchoring the open 63m² creative space.',
+    prov: 'Cast-in-Place Structural',
+    finish: 'Raw Board-Formed Micro-Plaster',
+    thermal: 'Thermal Mass Inertia',
+    sustain: 'Low-Carbon Slag Cement Mix',
+    camPos: new THREE.Vector3(-1.8, 1.8, 1.8),
+    camTarget: new THREE.Vector3(0, 1.8, 0)
+  }
+];
+
+function buildHotspots() {
+  while (hotspotsGroup.children.length > 0) {
+    const child = hotspotsGroup.children[0];
+    hotspotsGroup.remove(child);
+  }
+  hotspotColliders.length = 0;
+
+  const currentHotspots = HOTSPOTS_DATA.filter(h => h.plan === currentPlanId);
+
+  const coreGeo = new THREE.SphereGeometry(0.09, 16, 16);
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffdf88 });
+
+  const innerRingGeo = new THREE.RingGeometry(0.12, 0.16, 32);
+  const innerRingMat = new THREE.MeshBasicMaterial({ color: 0xe5b869, side: THREE.DoubleSide });
+
+  const outerRingGeo = new THREE.RingGeometry(0.20, 0.24, 32);
+  const outerRingMat = new THREE.MeshBasicMaterial({ color: 0xffe8ab, side: THREE.DoubleSide, transparent: true, opacity: 0.65 });
+
+  const hitGeo = new THREE.SphereGeometry(0.38, 8, 8);
+  const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+
+  for (const data of currentHotspots) {
+    const beacon = new THREE.Group();
+    beacon.position.copy(data.pos);
+
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    beacon.add(core);
+
+    const innerRing = new THREE.Mesh(innerRingGeo, innerRingMat);
+    innerRing.name = 'innerRing';
+    innerRing.rotation.x = -Math.PI / 2;
+    beacon.add(innerRing);
+
+    const outerRing = new THREE.Mesh(outerRingGeo, outerRingMat);
+    outerRing.name = 'outerRing';
+    outerRing.rotation.x = -Math.PI / 2;
+    beacon.add(outerRing);
+
+    const collider = new THREE.Mesh(hitGeo, hitMat);
+    collider.userData = { hotspot: data };
+    beacon.add(collider);
+    hotspotColliders.push(collider);
+
+    hotspotsGroup.add(beacon);
+  }
+
+  hotspotsGroup.visible = (currentAppMode === 'presentation');
+}
+
+function openSpecModal(hs) {
+  playChime(659.25);
+  const modal = document.getElementById('pres-spec-modal');
+  if (!modal) return;
+
+  document.getElementById('spec-card-kicker').innerHTML = hs.kicker;
+  document.getElementById('spec-card-title').textContent = hs.title;
+  document.getElementById('spec-card-narrative').textContent = hs.narrative;
+  document.getElementById('spec-grid-prov').textContent = hs.prov;
+  document.getElementById('spec-grid-finish').textContent = hs.finish;
+  document.getElementById('spec-grid-thermal').textContent = hs.thermal;
+  document.getElementById('spec-grid-sustain').innerHTML = hs.sustain;
+
+  modal.classList.add('open');
+
+  const focusBtn = document.getElementById('spec-focus-cam-btn');
+  focusBtn.onclick = () => {
+    gsap.to(camera.position, { ...hs.camPos, duration: 1.4, ease: 'power3.inOut' });
+    gsap.to(controls.target, { ...hs.camTarget, duration: 1.4, ease: 'power3.inOut' });
+  };
+}
+
+function closeSpecModal() {
+  const modal = document.getElementById('pres-spec-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+document.getElementById('spec-modal-close').addEventListener('click', closeSpecModal);
+document.getElementById('spec-dismiss-btn').addEventListener('click', closeSpecModal);
+
+// ============================================================================
+// 3D BIM DIMENSION RULERS (STUDIO MODE)
+// ============================================================================
+const dimensionsGroup = new THREE.Group();
+scene.add(dimensionsGroup);
+let showDimensions = false;
+
+function createDimensionText(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 72;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(20, 18, 15, 0.88)';
+  ctx.beginPath();
+  ctx.roundRect(4, 4, 248, 64, 12);
+  ctx.fill();
+  ctx.strokeStyle = '#e5b869';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.font = 'bold 26px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 44);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+  sprite.scale.set(1.6, 0.45, 1);
+  return sprite;
+}
+
+function buildDimensionRulers() {
+  while (dimensionsGroup.children.length > 0) {
+    const child = dimensionsGroup.children[0];
+    dimensionsGroup.remove(child);
+  }
+
+  const w = roomWidth;
+  const d = roomDepth;
+  const h = wallHeight;
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xd49b42, linewidth: 2 });
+
+  // Width Dimension Line
+  const zOffset = d / 2 + 0.65;
+  const wPts = [
+    new THREE.Vector3(-w / 2, 0.1, zOffset),
+    new THREE.Vector3(w / 2, 0.1, zOffset)
+  ];
+  const wGeo = new THREE.BufferGeometry().setFromPoints(wPts);
+  const wLine = new THREE.Line(wGeo, lineMat);
+  dimensionsGroup.add(wLine);
+
+  const tick1 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(-w / 2, 0.1, zOffset - 0.25),
+    new THREE.Vector3(-w / 2, 0.1, zOffset + 0.25)
+  ]), lineMat);
+  const tick2 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(w / 2, 0.1, zOffset - 0.25),
+    new THREE.Vector3(w / 2, 0.1, zOffset + 0.25)
+  ]), lineMat);
+  dimensionsGroup.add(tick1);
+  dimensionsGroup.add(tick2);
+
+  const wLabel = createDimensionText(`${w.toFixed(2)} m`);
+  wLabel.position.set(0, 0.5, zOffset);
+  dimensionsGroup.add(wLabel);
+
+  // Depth Dimension Line
+  const xOffset = w / 2 + 0.65;
+  const dPts = [
+    new THREE.Vector3(xOffset, 0.1, -d / 2),
+    new THREE.Vector3(xOffset, 0.1, d / 2)
+  ];
+  const dGeo = new THREE.BufferGeometry().setFromPoints(dPts);
+  const dLine = new THREE.Line(dGeo, lineMat);
+  dimensionsGroup.add(dLine);
+
+  const tick3 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(xOffset - 0.25, 0.1, -d / 2),
+    new THREE.Vector3(xOffset + 0.25, 0.1, -d / 2)
+  ]), lineMat);
+  const tick4 = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(xOffset - 0.25, 0.1, d / 2),
+    new THREE.Vector3(xOffset + 0.25, 0.1, d / 2)
+  ]), lineMat);
+  dimensionsGroup.add(tick3);
+  dimensionsGroup.add(tick4);
+
+  const dLabel = createDimensionText(`${d.toFixed(2)} m`);
+  dLabel.position.set(xOffset, 0.5, 0);
+  dimensionsGroup.add(dLabel);
+
+  // Height Dimension Line
+  const hPts = [
+    new THREE.Vector3(-w / 2 - 0.5, 0, -d / 2 - 0.5),
+    new THREE.Vector3(-w / 2 - 0.5, h, -d / 2 - 0.5)
+  ];
+  const hGeo = new THREE.BufferGeometry().setFromPoints(hPts);
+  const hLine = new THREE.Line(hGeo, lineMat);
+  dimensionsGroup.add(hLine);
+
+  const hLabel = createDimensionText(`H ${h.toFixed(2)} m`);
+  hLabel.position.set(-w / 2 - 0.5, h / 2, -d / 2 - 0.5);
+  dimensionsGroup.add(hLabel);
+
+  dimensionsGroup.visible = showDimensions && (currentAppMode === 'studio');
+}
+
+const toggleDimBtn = document.getElementById('toggle-dimensions-btn');
+if (toggleDimBtn) {
+  toggleDimBtn.addEventListener('click', () => {
+    showDimensions = !showDimensions;
+    toggleDimBtn.classList.toggle('highlight', showDimensions);
+    dimensionsGroup.visible = showDimensions && (currentAppMode === 'studio');
+  });
+}
+
+// ============================================================================
+// ATMOSPHERIC LIGHTING & MOOD SYSTEM
+// ============================================================================
+const ATMOSPHERE_MOODS = {
+  day: {
+    sunColor: 0xfff6ea,
+    sunIntensity: 2.3,
+    sunPos: new THREE.Vector3(-10, 14, -5),
+    ambientColor: 0xfff8f0,
+    ambientIntensity: 1.25,
+    bg: 0xd7cfc4,
+    ledIntensity: 0.3,
+    exposure: 1.08
+  },
+  sunset: {
+    sunColor: 0xff8c38,
+    sunIntensity: 3.4,
+    sunPos: new THREE.Vector3(-14, 4.2, -4),
+    ambientColor: 0x6e4835,
+    ambientIntensity: 0.85,
+    bg: 0x362520,
+    ledIntensity: 2.4,
+    exposure: 1.20
+  },
+  dusk: {
+    sunColor: 0x486498,
+    sunIntensity: 0.9,
+    sunPos: new THREE.Vector3(-12, 2.5, -4),
+    ambientColor: 0x222635,
+    ambientIntensity: 0.65,
+    bg: 0x161824,
+    ledIntensity: 3.0,
+    exposure: 1.28
+  },
+  night: {
+    sunColor: 0x335599,
+    sunIntensity: 0.5,
+    sunPos: new THREE.Vector3(-10, 8, -5),
+    ambientColor: 0x11131c,
+    ambientIntensity: 0.45,
+    bg: 0x0c0e14,
+    ledIntensity: 3.4,
+    exposure: 1.35
+  }
+};
+
+let currentAtmosphereMood = 'day';
+
+function applyAtmosphereMood(moodKey) {
+  currentAtmosphereMood = moodKey;
+  const mood = ATMOSPHERE_MOODS[moodKey];
+  if (!mood) return;
+
+  playChime(440);
+
+  gsap.to(sunLight.color, { ...new THREE.Color(mood.sunColor), duration: 1.2 });
+  gsap.to(sunLight, { intensity: mood.sunIntensity, duration: 1.2 });
+  gsap.to(sunLight.position, { ...mood.sunPos, duration: 1.4 });
+
+  gsap.to(ambientLight.color, { ...new THREE.Color(mood.ambientColor), duration: 1.2 });
+  gsap.to(ambientLight, { intensity: mood.ambientIntensity, duration: 1.2 });
+
+  materials.warmLed.emissiveIntensity = mood.ledIntensity;
+  renderer.toneMappingExposure = mood.exposure;
+
+  scene.background.set(mood.bg);
+  scene.fog.color.set(mood.bg);
+
+  document.querySelectorAll('.pres-mood-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mood === moodKey);
+  });
+}
+
+document.querySelectorAll('.pres-mood-pill').forEach(btn => {
+  btn.addEventListener('click', () => applyAtmosphereMood(btn.dataset.mood));
+});
+
+// ============================================================================
+// ROOM VANTAGE POINT BOOKMARKS
+// ============================================================================
+const ROOM_BOOKMARKS = {
+  villa: {
+    entrance: { pos: new THREE.Vector3(-5.2, 1.8, 3.8), target: new THREE.Vector3(-1.2, 1.4, 0), name: 'Grand Entrance' },
+    salon: { pos: new THREE.Vector3(-3.4, 1.5, 0.6), target: new THREE.Vector3(-1.0, 1.1, 0.1), name: 'Living Salon' },
+    kitchen: { pos: new THREE.Vector3(1.4, 1.8, -3.2), target: new THREE.Vector3(2.8, 1.1, -1.8), name: "Chef's Island" },
+    suite: { pos: new THREE.Vector3(1.2, 1.7, 1.8), target: new THREE.Vector3(3.2, 1.1, 2.2), name: 'Master Suite' },
+    terrace: { pos: new THREE.Vector3(-3.8, 1.8, -1.0), target: new THREE.Vector3(-5.5, 1.8, -1.0), name: 'Sunset Glazing' },
+    dollhouse: { pos: new THREE.Vector3(15.5, 13.5, 14.5), target: new THREE.Vector3(0.5, 1.0, 0), name: '3D Dollhouse' }
+  },
+  studio: {
+    entrance: { pos: new THREE.Vector3(0, 1.7, 2.6), target: new THREE.Vector3(0, 1.3, -0.6), name: 'Studio Entry' },
+    salon: { pos: new THREE.Vector3(-1.8, 1.5, 0.8), target: new THREE.Vector3(1.2, 1.3, -0.2), name: 'Transform Lounge' },
+    kitchen: { pos: new THREE.Vector3(0.4, 1.6, 0.8), target: new THREE.Vector3(-1.8, 1.2, -0.4), name: 'Chef Counter' },
+    suite: { pos: new THREE.Vector3(0.2, 1.6, 1.2), target: new THREE.Vector3(2.0, 1.3, -0.6), name: 'Fold-out Sanctuary' },
+    terrace: { pos: new THREE.Vector3(-2.2, 1.8, -1.6), target: new THREE.Vector3(-3.5, 1.8, -1.6), name: 'Window Bay' },
+    dollhouse: { pos: new THREE.Vector3(11.0, 9.5, 10.2), target: new THREE.Vector3(0, 1.0, 0), name: 'Studio Dollhouse' }
+  },
+  loft: {
+    entrance: { pos: new THREE.Vector3(-3.8, 1.8, 3.2), target: new THREE.Vector3(0, 1.4, 0), name: 'Loft Threshold' },
+    salon: { pos: new THREE.Vector3(-2.2, 1.6, 1.4), target: new THREE.Vector3(1.2, 1.1, 0.6), name: 'Open Living' },
+    kitchen: { pos: new THREE.Vector3(1.2, 1.8, -2.4), target: new THREE.Vector3(2.2, 1.2, -1.2), name: 'Monolithic Bar' },
+    suite: { pos: new THREE.Vector3(2.0, 1.7, 1.6), target: new THREE.Vector3(3.2, 1.2, 1.8), name: 'Platform Bed' },
+    terrace: { pos: new THREE.Vector3(-3.2, 2.0, -2.0), target: new THREE.Vector3(-4.5, 2.0, -2.0), name: 'High Glazing' },
+    dollhouse: { pos: new THREE.Vector3(13.8, 11.8, 12.8), target: new THREE.Vector3(0, 1.2, 0), name: 'Loft Diorama' }
+  }
+};
+
+let currentBookmarkKey = 'entrance';
+
+function goToBookmark(bmKey) {
+  currentBookmarkKey = bmKey;
+  const planBookmarks = ROOM_BOOKMARKS[currentPlanId] || ROOM_BOOKMARKS.villa;
+  const bm = planBookmarks[bmKey];
+  if (!bm) return;
+
+  playChime(523.25);
+
+  document.querySelectorAll('.pres-bookmark-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.bookmark === bmKey);
+  });
+
+  gsap.to(camera.position, { ...bm.pos, duration: 1.6, ease: 'power3.inOut' });
+  gsap.to(controls.target, { ...bm.target, duration: 1.6, ease: 'power3.inOut' });
+}
+
+document.querySelectorAll('.pres-bookmark-pill').forEach(btn => {
+  btn.addEventListener('click', () => goToBookmark(btn.dataset.bookmark));
+});
+
+document.querySelectorAll('.pres-scen-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    const idx = parseInt(pill.dataset.mode, 10);
+    setMode(idx);
+  });
+});
+
+// ============================================================================
+// CINEMATIC AUTOMATED TOUR ENGINE & VIP TOUR DIRECTOR
+// ============================================================================
+const TOUR_ROUTES = {
+  villa: [
+    { key: 'entrance', title: 'Grand Arrival & Threshold', desc: 'Welcoming double-height entrance overlooking the entire sunlit diorama, passing into the main salon.', duration: 3.8 },
+    { key: 'salon', title: 'Living Salon & Bespoke Seating', desc: 'Curated seating arrangement with Nordic armchairs, wool bouclé upholstery, and fluted joinery.', duration: 3.5 },
+    { key: 'kitchen', title: "Gourmet Chef's Island", desc: 'Dramatic Calacatta Viola marble island with integrated concealed induction and ash wood dining.', duration: 3.6 },
+    { key: 'suite', title: 'Master Bedroom Retreat', desc: 'Serene sleeping volume with bespoke platform bed, organic linen drapery, and warm indirect LEDs.', duration: 3.6 },
+    { key: 'terrace', title: 'Sunset Panoramic Glazing', desc: 'Floor-to-ceiling double-glazed aperture framing radiant golden light across the suite.', duration: 3.8 },
+    { key: 'dollhouse', title: 'Architectural Isometric View', desc: 'Elevated cutaway perspective displaying the full spatial zoning and circulation pathways.', duration: 4.0 }
+  ],
+  studio: [
+    { key: 'entrance', title: 'Micro Studio Threshold', desc: 'Compact footprint engineered for maximum light and spatial efficiency.', duration: 3.5 },
+    { key: 'salon', title: 'Modular Joinery Core', desc: 'Transformative millwork wall that converts between desk, dining, and bed.', duration: 3.5 },
+    { key: 'kitchen', title: 'Integrated Chef Kitchenette', desc: 'Concealed sliding pocket doors reveal a fully functional culinary setup.', duration: 3.5 },
+    { key: 'suite', title: 'Kinetic Sleeping Nook', desc: 'Counterbalanced Murphy bed deployed with soft amber reading illumination.', duration: 3.5 },
+    { key: 'dollhouse', title: 'Studio 3D Overview', desc: 'Full architectural cutaway of the 35.4 M² adaptive layout.', duration: 3.5 }
+  ],
+  loft: [
+    { key: 'entrance', title: 'Industrial Loft Threshold', desc: 'Spacious high-ceiling entrance framing the exposed concrete structural column.', duration: 3.5 },
+    { key: 'salon', title: 'Open Salon & Atelier Workspace', desc: 'Fluid open plan layout supporting both focused creative work and social leisure.', duration: 3.5 },
+    { key: 'kitchen', title: 'Monolithic Architectural Bar', desc: 'Charcoal quartz island acting as the social centerpiece of the loft.', duration: 3.5 },
+    { key: 'suite', title: 'Platform Lounge Suite', desc: 'Elevated sleeping platform overlooking the double-height industrial glazing.', duration: 3.5 },
+    { key: 'dollhouse', title: 'Loft Diorama Cutaway', desc: 'Comprehensive bird-eye view of the 63 M² open industrial volume.', duration: 3.5 }
+  ]
+};
+
+let isTourActive = false;
+let isTourPaused = false;
+let tourStepIndex = 0;
+let tourTimeout = null;
+let tourSpeedModifier = 1.0;
+let customTourMoves = [];
+
+function initTourMoves() {
+  const defaultRoute = TOUR_ROUTES[currentPlanId] || TOUR_ROUTES.villa;
+  const bookmarks = ROOM_BOOKMARKS[currentPlanId] || ROOM_BOOKMARKS.villa;
+  customTourMoves = defaultRoute.map((step, idx) => {
+    const bm = bookmarks[step.key] || {
+      pos: new THREE.Vector3(camera.position.x, camera.position.y, camera.position.z),
+      target: new THREE.Vector3(controls.target.x, controls.target.y, controls.target.z)
+    };
+    return {
+      title: step.title,
+      desc: step.desc,
+      duration: step.duration || 3.5,
+      pos: { x: bm.pos.x, y: bm.pos.y, z: bm.pos.z },
+      target: { x: bm.target.x, y: bm.target.y, z: bm.target.z },
+      key: step.key
+    };
+  });
+  renderTourMovesList();
+}
+
+const tourMovesListEl = document.getElementById('tour-moves-list');
+
+function renderTourMovesList() {
+  if (!tourMovesListEl) return;
+  tourMovesListEl.innerHTML = '';
+
+  if (customTourMoves.length === 0) {
+    tourMovesListEl.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--color-silver-muted); font-size: 0.85rem;">No moves in tour sequence. Click "Capture Current View as Move" above to add waypoints!</div>';
+    return;
+  }
+
+  customTourMoves.forEach((move, idx) => {
+    const card = document.createElement('div');
+    card.className = 'tour-move-card';
+    card.innerHTML = `
+      <div class="move-index-badge">${idx + 1}</div>
+      <div class="move-info">
+        <input type="text" class="move-name-input" value="${move.title}" data-index="${idx}" placeholder="Move name">
+        <div class="move-coords">X: ${move.pos.x.toFixed(1)} &bull; Y: ${move.pos.y.toFixed(1)} &bull; Z: ${move.pos.z.toFixed(1)} &bull; ${move.duration}s</div>
+      </div>
+      <div class="move-actions">
+        <button class="move-act-btn preview" data-index="${idx}" title="Preview this camera vantage point">🔭 View</button>
+        <button class="move-act-btn update" data-index="${idx}" title="Update this move with current camera position">📷 Update</button>
+        <button class="move-act-btn delete" data-index="${idx}" title="Delete move">&times;</button>
+      </div>
+    `;
+
+    // Title edit
+    const input = card.querySelector('.move-name-input');
+    input.addEventListener('change', (e) => {
+      customTourMoves[idx].title = e.target.value;
+    });
+
+    // Preview view
+    card.querySelector('.move-act-btn.preview').addEventListener('click', () => {
+      gsap.to(camera.position, { ...move.pos, duration: 1.4, ease: 'power2.inOut' });
+      gsap.to(controls.target, { ...move.target, duration: 1.4, ease: 'power2.inOut' });
+      playChime(580);
+    });
+
+    // Update with current camera
+    card.querySelector('.move-act-btn.update').addEventListener('click', () => {
+      move.pos = { x: parseFloat(camera.position.x.toFixed(2)), y: parseFloat(camera.position.y.toFixed(2)), z: parseFloat(camera.position.z.toFixed(2)) };
+      move.target = { x: parseFloat(controls.target.x.toFixed(2)), y: parseFloat(controls.target.y.toFixed(2)), z: parseFloat(controls.target.z.toFixed(2)) };
+      renderTourMovesList();
+      playChime(784);
+    });
+
+    // Delete move
+    card.querySelector('.move-act-btn.delete').addEventListener('click', () => {
+      customTourMoves.splice(idx, 1);
+      renderTourMovesList();
+      playChime(350);
+    });
+
+    tourMovesListEl.appendChild(card);
+  });
+}
+
+// Capture current view as tour move
+document.getElementById('btn-capture-move').addEventListener('click', () => {
+  const moveNumber = customTourMoves.length + 1;
+  const newMove = {
+    title: `VIP Viewpoint #${moveNumber}`,
+    desc: `Custom architectural camera angle captured at (${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}).`,
+    duration: 3.5,
+    pos: {
+      x: parseFloat(camera.position.x.toFixed(2)),
+      y: parseFloat(camera.position.y.toFixed(2)),
+      z: parseFloat(camera.position.z.toFixed(2))
+    },
+    target: {
+      x: parseFloat(controls.target.x.toFixed(2)),
+      y: parseFloat(controls.target.y.toFixed(2)),
+      z: parseFloat(controls.target.z.toFixed(2))
+    }
+  };
+  customTourMoves.push(newMove);
+  renderTourMovesList();
+  playChime(880);
+});
+
+// Tour Director Modal Controls
+const tourDirectorModal = document.getElementById('tour-director-modal');
+document.getElementById('pres-tour-director-btn').addEventListener('click', () => {
+  if (customTourMoves.length === 0) initTourMoves();
+  tourDirectorModal.classList.add('visible');
+  tourDirectorModal.classList.add('open');
+  renderTourMovesList();
+});
+document.getElementById('close-tour-dir-btn').addEventListener('click', () => {
+  tourDirectorModal.classList.remove('visible');
+  tourDirectorModal.classList.remove('open');
+});
+
+// Speed pills
+document.querySelectorAll('.tour-speed-row .pill-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tour-speed-row .pill-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tourSpeedModifier = parseFloat(btn.dataset.speed) || 1.0;
+  });
+});
+
+// Reset signature moves
+document.getElementById('btn-reset-default-tour').addEventListener('click', () => {
+  initTourMoves();
+  playChime(440);
+});
+
+// Play custom tour
+document.getElementById('btn-play-custom-tour').addEventListener('click', () => {
+  tourDirectorModal.classList.remove('visible');
+  tourDirectorModal.classList.remove('open');
+  startCinematicTour();
+});
+
+function startCinematicTour() {
+  if (customTourMoves.length === 0) initTourMoves();
+  if (customTourMoves.length === 0) return;
+
+  isTourActive = true;
+  isTourPaused = false;
+  tourStepIndex = 0;
+
+  const player = document.getElementById('pres-tour-player');
+  if (player) player.classList.add('active');
+
+  controls.enabled = false;
+  executeTourStep();
+}
+
+function executeTourStep() {
+  if (!isTourActive || isTourPaused) return;
+  if (customTourMoves.length === 0) initTourMoves();
+  if (customTourMoves.length === 0) return;
+
+  if (tourStepIndex >= customTourMoves.length) {
+    tourStepIndex = 0;
+  }
+
+  const step = customTourMoves[tourStepIndex];
+  if (!step) return;
+
+  const totalMoves = customTourMoves.length;
+  document.getElementById('tour-step-badge').textContent = `MOVE ${tourStepIndex + 1} OF ${totalMoves}`;
+  document.getElementById('tour-stop-title').textContent = step.title;
+  document.getElementById('tour-stop-desc').textContent = step.desc || `Architectural Tour Waypoint ${tourStepIndex + 1}`;
+
+  const progressPercent = ((tourStepIndex + 1) / totalMoves) * 100;
+  document.getElementById('tour-progress-bar').style.width = `${progressPercent}%`;
+
+  if (step.key) {
+    document.querySelectorAll('.pres-bookmark-pill').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.bookmark === step.key);
+    });
+  }
+
+  const stepDuration = Math.max(1.4, (step.duration || 3.5) / tourSpeedModifier);
+
+  gsap.to(camera.position, { ...step.pos, duration: stepDuration, ease: 'sine.inOut' });
+  gsap.to(controls.target, { ...step.target, duration: stepDuration, ease: 'sine.inOut' });
+
+  const dwellTime = (stepDuration + 2.0 / tourSpeedModifier) * 1000;
+  clearTimeout(tourTimeout);
+  tourTimeout = setTimeout(() => {
+    if (isTourActive && !isTourPaused) {
+      tourStepIndex++;
+      executeTourStep();
+    }
+  }, dwellTime);
+}
+
+function pauseResumeTour() {
+  if (!isTourActive) return;
+  isTourPaused = !isTourPaused;
+  const icon = document.getElementById('tour-play-pause-icon');
+  if (icon) icon.textContent = isTourPaused ? '▶️' : '⏸️';
+  if (!isTourPaused) executeTourStep();
+}
+
+function nextTourStep() {
+  if (!isTourActive) return;
+  clearTimeout(tourTimeout);
+  if (customTourMoves.length === 0) initTourMoves();
+  tourStepIndex = (tourStepIndex + 1) % customTourMoves.length;
+  executeTourStep();
+}
+
+function stopCinematicTour() {
+  isTourActive = false;
+  clearTimeout(tourTimeout);
+  const player = document.getElementById('pres-tour-player');
+  if (player) player.classList.remove('active');
+  controls.enabled = true;
+}
+
+document.getElementById('pres-start-tour-btn').addEventListener('click', startCinematicTour);
+document.getElementById('tour-pause-btn').addEventListener('click', pauseResumeTour);
+document.getElementById('tour-next-btn').addEventListener('click', nextTourStep);
+document.getElementById('tour-close-btn').addEventListener('click', stopCinematicTour);
+
+// ============================================================================
+// CINEMA ANAMORPHIC 2.39:1 LETTERBOX
+// ============================================================================
+let isLetterboxActive = false;
+
+function toggleLetterbox() {
+  isLetterboxActive = !isLetterboxActive;
+  document.body.classList.toggle('letterbox-active', isLetterboxActive);
+  const btn = document.getElementById('pres-letterbox-btn');
+  if (btn) btn.classList.toggle('active', isLetterboxActive);
+  playChime(isLetterboxActive ? 520 : 390);
+}
+document.getElementById('pres-letterbox-btn').addEventListener('click', toggleLetterbox);
+
+// ============================================================================
+// ARCHITECTURAL BLUEPRINT MINIMAP RADAR
+// ============================================================================
+const minimapCanvas = document.getElementById('minimap-canvas');
+const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+
+function drawMinimap() {
+  if (!minimapCtx || !minimapCanvas) return;
+  const w = minimapCanvas.width;
+  const h = minimapCanvas.height;
+
+  minimapCtx.clearRect(0, 0, w, h);
+
+  // Luxury blueprint slate background
+  minimapCtx.fillStyle = 'rgba(10, 14, 20, 0.94)';
+  minimapCtx.fillRect(0, 0, w, h);
+
+  // Scale calculation
+  const padding = 16;
+  const scaleX = (w - padding * 2) / (roomWidth || 10);
+  const scaleZ = (h - padding * 2) / (roomDepth || 8);
+  const scale = Math.min(scaleX, scaleZ);
+
+  const cx = w / 2;
+  const cy = h / 2;
+
+  // Grid lines
+  minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  minimapCtx.lineWidth = 1;
+  const step = scale * 2;
+  for (let x = cx % step; x < w; x += step) {
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(x, 0);
+    minimapCtx.lineTo(x, h);
+    minimapCtx.stroke();
+  }
+  for (let y = cy % step; y < h; y += step) {
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(0, y);
+    minimapCtx.lineTo(w, y);
+    minimapCtx.stroke();
+  }
+
+  // Outer Room Boundary
+  const rw = (roomWidth || 10) * scale;
+  const rd = (roomDepth || 8) * scale;
+  minimapCtx.strokeStyle = 'rgba(218, 165, 32, 0.65)';
+  minimapCtx.lineWidth = 2;
+  minimapCtx.strokeRect(cx - rw / 2, cy - rd / 2, rw, rd);
+
+  // Interior Partitions
+  minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  for (const p of activePartitionColliders) {
+    const px = cx + p.x * scale;
+    const py = cy + p.z * scale;
+    const pw = Math.max(3, p.hx * 2 * scale);
+    const ph = Math.max(3, p.hz * 2 * scale);
+    minimapCtx.fillRect(px - pw / 2, py - ph / 2, pw, ph);
+  }
+
+  // Furniture / Props
+  minimapCtx.fillStyle = 'rgba(160, 200, 255, 0.65)';
+  for (const obj of physicsObjects) {
+    const pos = obj.mesh.position;
+    const ox = cx + pos.x * scale;
+    const oy = cy + pos.z * scale;
+    minimapCtx.beginPath();
+    minimapCtx.arc(ox, oy, 2.5, 0, Math.PI * 2);
+    minimapCtx.fill();
+  }
+
+  // Camera Viewer Position & FOV Cone
+  const camX = cx + camera.position.x * scale;
+  const camY = cy + camera.position.z * scale;
+
+  // Camera look direction on XZ plane
+  const camDir = new THREE.Vector3();
+  camera.getWorldDirection(camDir);
+  const angle = Math.atan2(camDir.z, camDir.x);
+  const fovHalf = ((camera.fov || 50) * Math.PI) / 360;
+  const coneLength = 28;
+
+  // Draw FOV Cone
+  const grad = minimapCtx.createRadialGradient(camX, camY, 2, camX, camY, coneLength);
+  grad.addColorStop(0, 'rgba(223, 177, 91, 0.55)');
+  grad.addColorStop(1, 'rgba(223, 177, 91, 0.0)');
+  minimapCtx.fillStyle = grad;
+
+  minimapCtx.beginPath();
+  minimapCtx.moveTo(camX, camY);
+  minimapCtx.arc(camX, camY, coneLength, angle - fovHalf, angle + fovHalf);
+  minimapCtx.closePath();
+  minimapCtx.fill();
+
+  // Draw Camera Pin Dot
+  minimapCtx.fillStyle = '#dfb15b';
+  minimapCtx.beginPath();
+  minimapCtx.arc(camX, camY, 4, 0, Math.PI * 2);
+  minimapCtx.fill();
+  minimapCtx.strokeStyle = '#ffffff';
+  minimapCtx.lineWidth = 1.5;
+  minimapCtx.stroke();
+}
+
+// Click Minimap to Glide Camera
+if (minimapCanvas) {
+  minimapCanvas.addEventListener('click', (e) => {
+    const rect = minimapCanvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const w = minimapCanvas.width;
+    const h = minimapCanvas.height;
+    const padding = 16;
+    const scaleX = (w - padding * 2) / (roomWidth || 10);
+    const scaleZ = (h - padding * 2) / (roomDepth || 8);
+    const scale = Math.min(scaleX, scaleZ);
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const targetWorldX = (clickX - cx) / scale;
+    const targetWorldZ = (clickY - cy) / scale;
+
+    const halfW = roomWidth / 2 - 0.5;
+    const halfD = roomDepth / 2 - 0.5;
+    const clampedX = Math.max(-halfW, Math.min(halfW, targetWorldX));
+    const clampedZ = Math.max(-halfD, Math.min(halfD, targetWorldZ));
+
+    playChime(620);
+
+    if (currentCameraMode === 'walk') {
+      camera.position.x = clampedX;
+      camera.position.z = clampedZ;
+    } else {
+      gsap.to(camera.position, {
+        x: clampedX,
+        z: clampedZ,
+        duration: 1.4,
+        ease: 'power2.inOut'
+      });
+      gsap.to(controls.target, {
+        x: clampedX,
+        z: clampedZ - 1.5,
+        duration: 1.4,
+        ease: 'power2.inOut'
+      });
+    }
+  });
+}
+
+// ============================================================================
+// DUAL MASTER MODES (STUDIO VS CLIENT PRESENTATION)
+// ============================================================================
+let currentAppMode = 'studio';
+
+function setAppMode(mode) {
+  currentAppMode = mode;
+  document.body.className = (mode === 'presentation') ? 'mode-presentation' : 'mode-studio';
+
+  document.getElementById('btn-mode-studio').classList.toggle('active', mode === 'studio');
+  document.getElementById('btn-mode-presentation').classList.toggle('active', mode === 'presentation');
+
+  if (mode === 'presentation') {
+    // Hide all studio drawers & selection hud
+    catalogDrawer.classList.remove('open');
+    cadDrawer.classList.remove('open');
+    infoDrawer.classList.remove('open');
+    deselectObject();
+
+    // Show hotspots
+    hotspotsGroup.visible = true;
+    dimensionsGroup.visible = false;
+
+    // Start audio if enabled
+    if (isAudioEnabled) initAudioEngine();
+
+    // Fly to Grand Entrance Bookmark
+    goToBookmark('entrance');
+  } else {
+    // Studio mode
+    stopCinematicTour();
+    closeSpecModal();
+    if (tourDirectorModal) {
+      tourDirectorModal.classList.remove('visible');
+      tourDirectorModal.classList.remove('open');
+    }
+    hotspotsGroup.visible = false;
+    dimensionsGroup.visible = showDimensions;
+
+    // Return to overall view
+    setCameraMode('overall');
+  }
+}
+
+document.getElementById('btn-mode-studio').addEventListener('click', () => setAppMode('studio'));
+document.getElementById('btn-mode-presentation').addEventListener('click', () => setAppMode('presentation'));
+document.getElementById('pres-exit-btn').addEventListener('click', () => setAppMode('studio'));
+
+// Client Presentation Walk In
+document.getElementById('pres-walkin-btn').addEventListener('click', () => {
+  stopCinematicTour();
+  closeSpecModal();
+  if (tourDirectorModal) {
+    tourDirectorModal.classList.remove('visible');
+    tourDirectorModal.classList.remove('open');
+  }
+  setCameraMode('walk');
+});
+
+// Fullscreen Presentation Mode
+function togglePresentationFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+document.getElementById('pres-fullscreen-btn').addEventListener('click', togglePresentationFullscreen);
+
+// 4K Snapshot Capture
+function takePresentationSnapshot() {
+  const flash = document.getElementById('snapshot-flash');
+  if (flash) {
+    flash.classList.add('flash');
+    setTimeout(() => flash.classList.remove('flash'), 450);
+  }
+  playChime(880);
+
+  // High-res render to png
+  renderer.render(scene, camera);
+  const dataUrl = renderer.domElement.toDataURL('image/png');
+  const link = document.createElement('a');
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  link.download = `Wolfitway-Wolf3D-${currentPlanId.toUpperCase()}-${timestamp}.png`;
+  link.href = dataUrl;
+  link.click();
+}
+document.getElementById('pres-snapshot-btn').addEventListener('click', takePresentationSnapshot);
+
+// Global Keyboard Shortcuts
+window.addEventListener('keydown', (e) => {
+  // Ignore shortcuts if typing inside text fields
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+  // P: Toggle Studio / Presentation
+  if (e.code === 'KeyP' && !e.ctrlKey && !e.metaKey) {
+    setAppMode(currentAppMode === 'studio' ? 'presentation' : 'studio');
+    return;
+  }
+  // C: Toggle Cinema Anamorphic Letterbox
+  if (e.code === 'KeyC' && currentCameraMode !== 'walk') {
+    toggleLetterbox();
+    return;
+  }
+  // R: Rotate selected object 45°
+  if (e.code === 'KeyR' && currentCameraMode !== 'walk' && selectedObject) {
+    rotateSelectedObject();
+    return;
+  }
+  // S: Drop / settle selected object
+  if (e.code === 'KeyS' && currentCameraMode !== 'walk' && selectedObject) {
+    dropSettleSelectedObject();
+    return;
+  }
+  // D: Duplicate selected object
+  if (e.code === 'KeyD' && currentCameraMode !== 'walk' && selectedObject) {
+    duplicateSelectedObject();
+    return;
+  }
+  // Delete / Backspace: Remove selected object
+  if ((e.code === 'Delete' || e.code === 'Backspace') && selectedObject) {
+    deleteSelectedObject();
+    return;
+  }
+  // F: Fullscreen
+  if (e.code === 'KeyF' && currentCameraMode !== 'walk') {
+    togglePresentationFullscreen();
+    return;
+  }
+  // M: Sound Mute
+  if (e.code === 'KeyM') {
+    setAudioMute(!isAudioEnabled);
+    return;
+  }
+  // Space: Tour toggle in Presentation Mode
+  if (e.code === 'Space' && currentAppMode === 'presentation' && currentCameraMode !== 'walk') {
+    e.preventDefault();
+    if (isTourActive) pauseResumeTour();
+    else startCinematicTour();
+    return;
+  }
+  // Escape: Close modals, drawers, exit tour, deselect object, exit walk
+  if (e.code === 'Escape') {
+    closeSpecModal();
+    if (tourDirectorModal) {
+      tourDirectorModal.classList.remove('visible');
+      tourDirectorModal.classList.remove('open');
+    }
+    if (typeof closeAllDrawers === 'function') {
+      closeAllDrawers();
+    }
+    deselectObject();
+    if (isTourActive) stopCinematicTour();
+    if (currentCameraMode === 'walk') setCameraMode('overall');
+  }
+});
 
 // ============================================================================
 // RENDER LOOP & PHYSICS STEPPING
@@ -1521,6 +2948,17 @@ function animate() {
   requestAnimationFrame(animate);
 
   const delta = Math.min(clock.getDelta(), 0.05);
+
+  // Animate 3D Hotspot Beacons in Presentation Mode
+  if (hotspotsGroup.visible) {
+    const elapsedTime = clock.getElapsedTime();
+    hotspotsGroup.children.forEach((beacon, idx) => {
+      const ring = beacon.getObjectByName('innerRing');
+      const outer = beacon.getObjectByName('outerRing');
+      if (ring) ring.rotation.z += delta * 1.8;
+      if (outer) outer.scale.setScalar(1 + 0.15 * Math.sin(elapsedTime * 4 + idx * 1.5));
+    });
+  }
 
   // 1. Step Rapier WASM Physics
   if (physicsWorld) {
@@ -1534,6 +2972,17 @@ function animate() {
       obj.mesh.position.set(translation.x, translation.y, translation.z);
       obj.mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
     }
+
+    // Keep selection ring aligned under active prop
+    if (selectedObject && selectionRing && selectionRing.visible) {
+      selectionRing.position.x = selectedObject.mesh.position.x;
+      selectionRing.position.z = selectedObject.mesh.position.z;
+    }
+  }
+
+  // Draw Interactive Architectural Blueprint Minimap in Presentation Mode
+  if (currentAppMode === 'presentation' && typeof drawMinimap === 'function') {
+    drawMinimap();
   }
 
   // 2. Matterport First Person Walk Controller with Doorway Passage & Partition Collision
@@ -1547,6 +2996,8 @@ function animate() {
     if (walkKeys.right) moveVector.x += 1;
 
     if (moveVector.lengthSq() > 0) {
+      triggerFootstepSound();
+
       moveVector.normalize();
       moveVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), walkYaw);
       const nextPos = camera.position.clone().addScaledVector(moveVector, walkSpeed * delta);
@@ -1619,6 +3070,10 @@ function animate() {
 initPhysics().then(() => {
   // Load Default House Plan: Grand Villa Suite (3 Rooms)
   loadHousePlan('villa');
+
+  // Build Hotspots and Dimension Rulers
+  buildHotspots();
+  buildDimensionRulers();
 
   // Spawn sample props in the living salon
   spawnPhysicsObject('crate-wood', { x: -1.2, y: 1.8, z: 0.8 });
