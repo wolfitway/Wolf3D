@@ -89,8 +89,8 @@ Click the mode switcher pill at the top of the screen to switch to **VIP Showcas
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/your-username/wolf3d.git
-cd wolf3d
+git clone https://github.com/wolfitway-debug/Wolf3D.git
+cd Wolf3D
 npm install
 ```
 
