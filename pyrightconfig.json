@@ -1,0 +1,13 @@
+{
+  "venvPath": "scripts/hunyuan3d",
+  "venv": "venv",
+  "extraPaths": [
+    "scripts/hunyuan3d",
+    "scripts/hunyuan3d/Hunyuan3D-2"
+  ],
+  "exclude": [
+    "scripts/hunyuan3d/Hunyuan3D-2",
+    "**/venv",
+    "node_modules"
+  ]
+}
